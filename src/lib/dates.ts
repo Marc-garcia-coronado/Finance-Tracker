@@ -16,7 +16,9 @@ export function currentYear(): number {
 
 // Rango [inicio, finExclusivo) en 'YYYY-MM-DD' para un mes 'YYYY-MM'.
 export function monthRange(mKey: string): { start: string; endExclusive: string } {
-  const [y, m] = mKey.split('-').map(Number)
+  const parts = mKey.split('-')
+  const y = Number(parts[0])
+  const m = Number(parts[1])
   const start = `${mKey}-01`
   const nextMonth = m === 12 ? 1 : m + 1
   const nextYear = m === 12 ? y + 1 : y
