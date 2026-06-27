@@ -1,0 +1,34 @@
+# Backup periódico de la base de datos (el free tier de Supabase NO tiene backups).
+# Renombra este archivo a `backup.yml` para activarlo.
+# Requiere el secret SUPABASE_DB_URL con la cadena de conexión de Postgres
+#   (Supabase -> Project Settings -> Database -> Connection string -> URI).
+# El dump se sube como artifact del workflow (retención configurable).
+
+name: Backup DB
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # cada domingo a las 03:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente de Postgres
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: pg_dump
+        run: |
+          ts=$(date -u +%Y%m%d-%H%M%S)
+          pg_dump "${{ secrets.SUPABASE_DB_URL }}" --no-owner --no-privileges -f "backup-$ts.sql"
+          echo "DUMP=backup-$ts.sql" >> "$GITHUB_ENV"
+
+      - name: Subir artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: ${{ env.DUMP }}
+          retention-days: 30
