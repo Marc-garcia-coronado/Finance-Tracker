@@ -3,6 +3,8 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { queryClient } from '@/lib/queryClient'
 import { AuthProvider } from '@/features/auth/AuthProvider'
+import { CryptoProvider } from '@/features/crypto/CryptoProvider'
+import { VaultGate } from '@/features/crypto/VaultGate'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { AppLayout } from '@/components/AppLayout'
 import { LoadingState } from '@/components/states'
@@ -38,25 +40,29 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <Suspense fallback={<LoadingState />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                  <Route index element={<DashboardPage />} />
-                  <Route path="movimientos" element={<MovimientosPage />} />
-                  <Route path="mensual" element={<MensualPage />} />
-                  <Route path="recurrentes" element={<RecurrentesPage />} />
-                  <Route path="objetivos" element={<ObjetivosPage />} />
-                  <Route path="patrimonio" element={<PatrimonioPage />} />
-                  <Route path="config" element={<ConfigPage />} />
+        <CryptoProvider>
+          <BrowserRouter>
+            <Suspense fallback={<LoadingState />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<VaultGate />}>
+                    <Route element={<AppLayout />}>
+                      <Route index element={<DashboardPage />} />
+                      <Route path="movimientos" element={<MovimientosPage />} />
+                      <Route path="mensual" element={<MensualPage />} />
+                      <Route path="recurrentes" element={<RecurrentesPage />} />
+                      <Route path="objetivos" element={<ObjetivosPage />} />
+                      <Route path="patrimonio" element={<PatrimonioPage />} />
+                      <Route path="config" element={<ConfigPage />} />
+                    </Route>
+                  </Route>
                 </Route>
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </CryptoProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/ui'
 import { Money } from '@/components/Money'
 import { Stat } from '@/components/Stat'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { useBalances } from '@/lib/queries'
+import { AdjustBalanceModal, type AdjustTarget } from './AdjustBalanceModal'
 
 export function PatrimonioPage() {
   const balances = useBalances()
+  const [adjusting, setAdjusting] = useState<AdjustTarget | null>(null)
 
   if (balances.isLoading) return <LoadingState />
   if (balances.isError)
@@ -22,7 +25,7 @@ export function PatrimonioPage() {
     <div>
       <PageHeader
         title="Patrimonio"
-        subtitle="Derivado de los movimientos. No se introduce a mano."
+        subtitle="Derivado de los movimientos. Ajusta el saldo real cuando difiera (p. ej. inversiones)."
       />
 
       {assets.length === 0 ? (
@@ -40,6 +43,7 @@ export function PatrimonioPage() {
                 <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-4 py-3 font-medium">Cuenta</th>
                   <th className="px-4 py-3 text-right font-medium">Saldo</th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -48,6 +52,20 @@ export function PatrimonioPage() {
                     <td className="px-4 py-3 text-slate-800">{a.name}</td>
                     <td className="px-4 py-3 text-right">
                       <Money cents={a.balance_cents ?? 0} colored />
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() =>
+                          setAdjusting({
+                            id: a.account_id!,
+                            name: a.name!,
+                            balanceCents: a.balance_cents ?? 0,
+                          })
+                        }
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                      >
+                        Ajustar
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -58,12 +76,15 @@ export function PatrimonioPage() {
                   <td className="px-4 py-3 text-right">
                     <Money cents={total} />
                   </td>
+                  <td />
                 </tr>
               </tfoot>
             </table>
           </Card>
         </div>
       )}
+
+      <AdjustBalanceModal account={adjusting} onClose={() => setAdjusting(null)} />
     </div>
   )
 }

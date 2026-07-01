@@ -92,7 +92,8 @@ export type Database = {
           user_id: string
           entry_id: string
           account_id: string
-          amount_cents: number
+          amount_cents: number | null
+          amount_enc: string | null
           created_at: string
         }
         Insert: {
@@ -100,7 +101,8 @@ export type Database = {
           user_id?: string
           entry_id: string
           account_id: string
-          amount_cents: number
+          amount_cents?: number | null
+          amount_enc?: string | null
           created_at?: string
         }
         Update: {
@@ -108,7 +110,8 @@ export type Database = {
           user_id?: string
           entry_id?: string
           account_id?: string
-          amount_cents?: number
+          amount_cents?: number | null
+          amount_enc?: string | null
           created_at?: string
         }
         Relationships: [
@@ -131,18 +134,54 @@ export type Database = {
       settings: {
         Row: {
           user_id: string
-          estimated_monthly_income_cents: number
+          estimated_monthly_income_cents: number | null
+          income_enc: string | null
           updated_at: string
         }
         Insert: {
           user_id?: string
-          estimated_monthly_income_cents?: number
+          estimated_monthly_income_cents?: number | null
+          income_enc?: string | null
           updated_at?: string
         }
         Update: {
           user_id?: string
-          estimated_monthly_income_cents?: number
+          estimated_monthly_income_cents?: number | null
+          income_enc?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      vault: {
+        Row: {
+          user_id: string
+          salt_p: string
+          salt_r: string
+          wrap_p: string
+          wrap_r: string
+          verifier: string
+          version: number
+          created_at: string
+        }
+        Insert: {
+          user_id?: string
+          salt_p: string
+          salt_r: string
+          wrap_p: string
+          wrap_r: string
+          verifier: string
+          version?: number
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          salt_p?: string
+          salt_r?: string
+          wrap_p?: string
+          wrap_r?: string
+          verifier?: string
+          version?: number
+          created_at?: string
         }
         Relationships: []
       }
@@ -180,8 +219,10 @@ export type Database = {
           id: string
           user_id: string
           name: string
-          target_cents: number
-          monthly_contribution_cents: number
+          target_cents: number | null
+          target_enc: string | null
+          monthly_contribution_cents: number | null
+          monthly_contribution_enc: string | null
           linked_account_id: string | null
           created_at: string
         }
@@ -189,8 +230,10 @@ export type Database = {
           id?: string
           user_id?: string
           name: string
-          target_cents: number
-          monthly_contribution_cents?: number
+          target_cents?: number | null
+          target_enc?: string | null
+          monthly_contribution_cents?: number | null
+          monthly_contribution_enc?: string | null
           linked_account_id?: string | null
           created_at?: string
         }
@@ -198,8 +241,10 @@ export type Database = {
           id?: string
           user_id?: string
           name?: string
-          target_cents?: number
-          monthly_contribution_cents?: number
+          target_cents?: number | null
+          target_enc?: string | null
+          monthly_contribution_cents?: number | null
+          monthly_contribution_enc?: string | null
           linked_account_id?: string | null
           created_at?: string
         }
@@ -218,7 +263,8 @@ export type Database = {
           id: string
           user_id: string
           description: string
-          amount_cents: number
+          amount_cents: number | null
+          amount_enc: string | null
           from_account_id: string
           to_account_id: string
           kind: Database['public']['Enums']['entry_kind']
@@ -232,7 +278,8 @@ export type Database = {
           id?: string
           user_id?: string
           description: string
-          amount_cents: number
+          amount_cents?: number | null
+          amount_enc?: string | null
           from_account_id: string
           to_account_id: string
           kind?: Database['public']['Enums']['entry_kind']
@@ -246,7 +293,8 @@ export type Database = {
           id?: string
           user_id?: string
           description?: string
-          amount_cents?: number
+          amount_cents?: number | null
+          amount_enc?: string | null
           from_account_id?: string
           to_account_id?: string
           kind?: Database['public']['Enums']['entry_kind']
@@ -274,29 +322,7 @@ export type Database = {
         ]
       }
     }
-    Views: {
-      account_balances: {
-        Row: {
-          account_id: string | null
-          user_id: string | null
-          name: string | null
-          type: Database['public']['Enums']['account_type'] | null
-          balance_cents: number | null
-        }
-        Relationships: []
-      }
-      monthly_totals: {
-        Row: {
-          user_id: string | null
-          month: string | null
-          account_id: string | null
-          name: string | null
-          type: Database['public']['Enums']['account_type'] | null
-          total_cents: number | null
-        }
-        Relationships: []
-      }
-    }
+    Views: Record<string, never>
     Functions: {
       create_entry: {
         Args: {
@@ -308,7 +334,7 @@ export type Database = {
         Returns: string
       }
       void_entry: {
-        Args: { p_entry_id: string }
+        Args: { p_entry_id: string; p_lines: Json }
         Returns: string
       }
       seed_default_accounts: {

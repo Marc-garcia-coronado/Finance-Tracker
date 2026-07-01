@@ -189,6 +189,8 @@ left join entries e on e.id = el.entry_id and e.voided_at is null
 group by a.id, a.user_id, a.name, a.type;
 
 -- Resumen mensual por cuenta (para páginas Mensual y Dashboard).
+--   Excluye los asientos de tipo 'adjustment' (revalorizaciones de cuentas):
+--   esos cambian el patrimonio pero NO son flujo de caja del mes.
 create or replace view monthly_totals with (security_invoker = on) as
 select e.user_id,
        date_trunc('month', e.occurred_on)::date as month,
@@ -200,6 +202,7 @@ from entries e
 join entry_lines el on el.entry_id = e.id
 join accounts a on a.id = el.account_id
 where e.voided_at is null
+  and e.kind <> 'adjustment'
 group by e.user_id, date_trunc('month', e.occurred_on), a.id, a.name, a.type;
 
 -- ============================================================================

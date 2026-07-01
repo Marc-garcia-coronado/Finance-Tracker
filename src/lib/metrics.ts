@@ -7,11 +7,23 @@
 //     fuera del flujo neto de consumo de forma natural.
 // Todo en céntimos enteros.
 // ---------------------------------------------------------------------------
-import type { Tables, Views } from './database.types'
+import type { Enums, Tables } from './database.types'
 
 type Account = Tables<'accounts'>
-type MonthlyTotal = Views<'monthly_totals'>
-type Recurring = Tables<'recurring_templates'>
+
+// Fila equivalente a la antigua vista monthly_totals, pero reconstruida en el
+// cliente tras descifrar (el servidor ya no puede sumar importes cifrados).
+export type MonthlyTotalRow = {
+  month: string
+  account_id: string
+  name: string
+  type: Enums<'account_type'>
+  total_cents: number
+}
+type MonthlyTotal = MonthlyTotalRow
+
+// Plantilla recurrente con el importe ya descifrado.
+type Recurring = { is_active: boolean; to_account_id: string; amount_cents: number }
 
 export type CategoryAmount = { accountId: string; name: string; cents: number }
 export type Consumo = { incomeCents: number; expenseCents: number; netCents: number }

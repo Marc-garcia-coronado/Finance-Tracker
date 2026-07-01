@@ -4,13 +4,12 @@ import {
   monthsToTarget,
   savingsRate,
   yearConsumo,
+  type MonthlyTotalRow,
 } from './metrics'
-import type { Views } from './database.types'
 
-type MT = Views<'monthly_totals'>
+type MT = MonthlyTotalRow
 
 const mt = (over: Partial<MT>): MT => ({
-  user_id: 'u',
   month: '2026-06',
   account_id: 'a',
   name: 'x',

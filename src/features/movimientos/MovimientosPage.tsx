@@ -14,6 +14,7 @@ import {
   type EntryFilters,
 } from '@/lib/queries'
 import { MovementForm } from './MovementForm'
+import { ImportMovementsModal } from './ImportMovementsModal'
 
 const PAGE_SIZE = 20
 const MONTHS = recentMonths(12)
@@ -33,6 +34,7 @@ const KIND_TEXT: Record<string, string> = {
 
 export function MovimientosPage() {
   const [open, setOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [month, setMonth] = useState<string>(MONTHS[0]!)
   const [kind, setKind] = useState<EntryFilters['kind']>('all')
   const [page, setPage] = useState(0)
@@ -62,7 +64,14 @@ export function MovimientosPage() {
     <div>
       <PageHeader
         title="Movimientos"
-        action={<Button onClick={() => setOpen(true)}>Nuevo</Button>}
+        action={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+              Importar
+            </Button>
+            <Button onClick={() => setOpen(true)}>Nuevo</Button>
+          </div>
+        }
       />
 
       <div className="mb-4 flex flex-wrap gap-3">
@@ -144,6 +153,8 @@ export function MovimientosPage() {
       <Modal open={open} onClose={() => setOpen(false)} title="Nuevo movimiento">
         <MovementForm onDone={() => setOpen(false)} />
       </Modal>
+
+      <ImportMovementsModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   )
 }
