@@ -114,7 +114,7 @@ export function OnboardingTour() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 backdrop-blur-sm sm:items-center sm:p-4"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) close()
       }}
@@ -123,13 +123,13 @@ export function OnboardingTour() {
         role="dialog"
         aria-modal="true"
         aria-label={current.title}
-        className="w-full max-w-md rounded-t-2xl bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl sm:rounded-2xl sm:pb-6"
+        className="w-full max-w-md rounded-t-3xl bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl sm:rounded-2xl sm:pb-6"
       >
         <div className="flex flex-col items-center text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-50 to-violet-100 text-indigo-600 ring-1 ring-indigo-100">
             <Icon className="h-7 w-7" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-900">{current.title}</h2>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">{current.title}</h2>
           <p className="mt-2 min-h-[4.5rem] text-sm leading-relaxed text-slate-600">
             {current.description}
           </p>

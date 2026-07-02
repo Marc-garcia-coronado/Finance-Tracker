@@ -67,12 +67,12 @@ export function AppLayout() {
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-600/30">
             €
           </div>
-          <span className="font-semibold text-slate-900">Finanzas</span>
+          <span className="font-bold tracking-tight text-slate-900">Finanzas</span>
           <button
             onClick={signOut}
             className="ml-auto hidden text-sm font-medium text-slate-500 hover:text-slate-900 md:block"
@@ -112,7 +112,7 @@ export function AppLayout() {
       {/* Barra de pestañas inferior (solo móvil) */}
       <nav
         aria-label="Secciones"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/70 bg-white/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42_/_0.12)] backdrop-blur-lg md:hidden"
       >
         <div className="mx-auto grid max-w-md grid-cols-5">
           {PRIMARY.map((item) => (
@@ -122,13 +122,24 @@ export function AppLayout() {
               end={item.end}
               className={({ isActive }) =>
                 cn(
-                  'flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition',
+                  'flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
                   isActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
                 )
               }
             >
-              <item.icon className="h-6 w-6" />
-              {item.label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={cn(
+                      'rounded-full px-3.5 py-0.5 transition',
+                      isActive && 'bg-indigo-100/80',
+                    )}
+                  >
+                    <item.icon className="h-6 w-6" />
+                  </span>
+                  {item.label}
+                </>
+              )}
             </NavLink>
           ))}
           <button
@@ -136,11 +147,18 @@ export function AppLayout() {
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
             className={cn(
-              'flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition',
+              'flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
               moreActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
             )}
           >
-            <EllipsisIcon className="h-6 w-6" />
+            <span
+              className={cn(
+                'rounded-full px-3.5 py-0.5 transition',
+                moreActive && 'bg-indigo-100/80',
+              )}
+            >
+              <EllipsisIcon className="h-6 w-6" />
+            </span>
             Más
           </button>
         </div>

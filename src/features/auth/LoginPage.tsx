@@ -52,10 +52,12 @@ export function LoginPage() {
     <main className="flex min-h-full items-center justify-center p-4">
       <div className="card w-full max-w-sm p-6">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-600 text-lg font-bold text-white">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-lg font-bold text-white shadow-lg shadow-indigo-600/30">
             €
           </div>
-          <h1 className="text-xl font-semibold text-slate-900">Finanzas personales</h1>
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">
+            Finanzas personales
+          </h1>
           <p className="mt-1 text-sm text-slate-500">
             {mode === 'login' ? 'Inicia sesión para continuar' : 'Crea tu cuenta'}
           </p>

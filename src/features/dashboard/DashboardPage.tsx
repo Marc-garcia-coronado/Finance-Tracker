@@ -39,6 +39,13 @@ import {
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const PIE_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
 
+const TOOLTIP_STYLE = {
+  borderRadius: 12,
+  border: '1px solid #e2e8f0',
+  boxShadow: '0 4px 12px -4px rgb(15 23 42 / 0.12)',
+  fontSize: 13,
+} as const
+
 export function DashboardPage() {
   const totals = useMonthlyTotals()
   const settings = useSettings()
@@ -131,6 +138,8 @@ export function DashboardPage() {
               <Tooltip
                 formatter={(v: number) => formatEuro(Math.round(v * 100))}
                 labelClassName="text-slate-700"
+                contentStyle={TOOLTIP_STYLE}
+                cursor={{ fill: 'rgb(15 23 42 / 0.04)' }}
               />
               <Legend />
               <Bar dataKey="income" name="Ingresos" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -161,7 +170,10 @@ export function DashboardPage() {
                         <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatEuro(Math.round(v * 100))} />
+                    <Tooltip
+                      formatter={(v: number) => formatEuro(Math.round(v * 100))}
+                      contentStyle={TOOLTIP_STYLE}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
