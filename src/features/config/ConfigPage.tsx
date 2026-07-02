@@ -16,6 +16,7 @@ import {
   type Account,
 } from '@/lib/queries'
 import type { Enums } from '@/lib/database.types'
+import { showOnboarding } from '@/features/onboarding/OnboardingTour'
 
 export function ConfigPage() {
   const settings = useSettings()
@@ -37,7 +38,23 @@ export function ConfigPage() {
         incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
       />
       <AccountsCard accounts={accounts.data ?? []} />
+      <HelpCard />
     </div>
+  )
+}
+
+// --- Ayuda ---------------------------------------------------------------------
+function HelpCard() {
+  return (
+    <Card className="p-4">
+      <h2 className="mb-1 font-semibold text-slate-900">Ayuda</h2>
+      <p className="mb-3 text-sm text-slate-500">
+        ¿Dudas sobre cómo funciona la app? Repasa el tutorial de bienvenida.
+      </p>
+      <Button variant="secondary" onClick={showOnboarding}>
+        Ver el tutorial
+      </Button>
+    </Card>
   )
 }
 
