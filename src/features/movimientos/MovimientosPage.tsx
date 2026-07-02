@@ -15,6 +15,8 @@ import {
 } from '@/lib/queries'
 import { MovementForm } from './MovementForm'
 import { ImportMovementsModal } from './ImportMovementsModal'
+import { PageTour } from '@/features/onboarding/PageTour'
+import { showTour } from '@/features/onboarding/tourStorage'
 
 const PAGE_SIZE = 20
 const MONTHS = recentMonths(12)
@@ -62,8 +64,10 @@ export function MovimientosPage() {
 
   return (
     <div>
+      <PageTour id="movimientos" />
       <PageHeader
         title="Movimientos"
+        onHelp={() => showTour('movimientos')}
         action={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setImportOpen(true)}>

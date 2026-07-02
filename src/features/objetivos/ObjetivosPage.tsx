@@ -18,6 +18,8 @@ import {
   useSaveGoal,
   type Goal,
 } from '@/lib/queries'
+import { PageTour } from '@/features/onboarding/PageTour'
+import { showTour } from '@/features/onboarding/tourStorage'
 
 export function ObjetivosPage() {
   const goals = useGoals()
@@ -52,7 +54,12 @@ export function ObjetivosPage() {
 
   return (
     <div>
-      <PageHeader title="Objetivos" action={<Button onClick={openNew}>Nuevo</Button>} />
+      <PageTour id="objetivos" />
+      <PageHeader
+        title="Objetivos"
+        onHelp={() => showTour('objetivos')}
+        action={<Button onClick={openNew}>Nuevo</Button>}
+      />
 
       {list.length === 0 ? (
         <EmptyState

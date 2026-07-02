@@ -19,6 +19,8 @@ import {
   type Account,
   type Recurring,
 } from '@/lib/queries'
+import { PageTour } from '@/features/onboarding/PageTour'
+import { showTour } from '@/features/onboarding/tourStorage'
 
 const MONTHS = recentMonths(6)
 
@@ -58,9 +60,11 @@ export function RecurrentesPage() {
 
   return (
     <div>
+      <PageTour id="recurrentes" />
       <PageHeader
         title="Recurrentes"
         subtitle="Plantillas que generan movimientos. Generar es idempotente: no duplica."
+        onHelp={() => showTour('recurrentes')}
         action={
           <Button
             onClick={() => {

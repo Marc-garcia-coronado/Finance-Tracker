@@ -6,6 +6,8 @@ import { Stat } from '@/components/Stat'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { useBalances } from '@/lib/queries'
 import { AdjustBalanceModal, type AdjustTarget } from './AdjustBalanceModal'
+import { PageTour } from '@/features/onboarding/PageTour'
+import { showTour } from '@/features/onboarding/tourStorage'
 
 export function PatrimonioPage() {
   const balances = useBalances()
@@ -23,9 +25,11 @@ export function PatrimonioPage() {
 
   return (
     <div>
+      <PageTour id="patrimonio" />
       <PageHeader
         title="Patrimonio"
         subtitle="Derivado de los movimientos. Ajusta el saldo real cuando difiera (p. ej. inversiones)."
+        onHelp={() => showTour('patrimonio')}
       />
 
       {assets.length === 0 ? (

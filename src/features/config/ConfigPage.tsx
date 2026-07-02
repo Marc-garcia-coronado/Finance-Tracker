@@ -16,7 +16,8 @@ import {
   type Account,
 } from '@/lib/queries'
 import type { Enums } from '@/lib/database.types'
-import { showOnboarding } from '@/features/onboarding/OnboardingTour'
+import { PageTour } from '@/features/onboarding/PageTour'
+import { showOnboarding, showTour } from '@/features/onboarding/tourStorage'
 
 export function ConfigPage() {
   const settings = useSettings()
@@ -30,7 +31,8 @@ export function ConfigPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Configuración" />
+      <PageTour id="config" />
+      <PageHeader title="Configuración" onHelp={() => showTour('config')} />
       <IncomeCard incomeCents={settings.data?.estimated_monthly_income_cents ?? 0} />
       <AllocationsCard
         accounts={accounts.data ?? []}

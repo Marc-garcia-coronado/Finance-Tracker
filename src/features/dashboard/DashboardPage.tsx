@@ -35,6 +35,7 @@ import {
   useRecurring,
   useSettings,
 } from '@/lib/queries'
+import { showOnboarding } from '@/features/onboarding/tourStorage'
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const PIE_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
@@ -113,7 +114,7 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Dashboard" subtitle={`Resumen de ${year}`} />
+      <PageHeader title="Dashboard" subtitle={`Resumen de ${year}`} onHelp={showOnboarding} />
 
       {/* KPIs del año */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

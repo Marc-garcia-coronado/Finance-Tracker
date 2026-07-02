@@ -107,6 +107,78 @@ export function LogoutIcon(props: IconProps) {
   )
 }
 
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 4v10m0 0 4-4m-4 4-4-4" />
+      <path d="M4 16.5v2A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-2" />
+    </Base>
+  )
+}
+
+export function UndoIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M8 5 4 9l4 4" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-4" />
+    </Base>
+  )
+}
+
+export function FunnelIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 5h16l-6 7v6l-4-2v-4L4 5Z" />
+    </Base>
+  )
+}
+
+export function PercentIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M19 5 5 19" />
+      <circle cx="7" cy="7" r="2.2" />
+      <circle cx="17" cy="17" r="2.2" />
+    </Base>
+  )
+}
+
+export function LinkIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M10.5 13.5a4 4 0 0 0 5.7.3l2.6-2.6a4 4 0 0 0-5.7-5.7l-1.5 1.5" />
+      <path d="M13.5 10.5a4 4 0 0 0-5.7-.3l-2.6 2.6a4 4 0 0 0 5.7 5.7l1.5-1.5" />
+    </Base>
+  )
+}
+
+export function ShieldIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 3.5 5 6v5c0 4.5 3 8 7 9.5 4-1.5 7-5 7-9.5V6l-7-2.5Z" />
+      <path d="m9 11.5 2 2 4-4" />
+    </Base>
+  )
+}
+
+export function PencilIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="m4 20 1-4L16.5 4.5a2.12 2.12 0 0 1 3 3L8 19l-4 1Z" />
+      <path d="m14.5 6.5 3 3" />
+    </Base>
+  )
+}
+
+export function WalletIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z" />
+      <path d="M20 10h-4a2 2 0 0 0 0 4h4" />
+    </Base>
+  )
+}
+
 export function LockIcon(props: IconProps) {
   return (
     <Base {...props}>

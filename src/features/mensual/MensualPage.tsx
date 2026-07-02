@@ -12,6 +12,8 @@ import {
   yearConsumo,
 } from '@/lib/metrics'
 import { useMonthlyTotals } from '@/lib/queries'
+import { PageTour } from '@/features/onboarding/PageTour'
+import { showTour } from '@/features/onboarding/tourStorage'
 
 export function MensualPage() {
   const totals = useMonthlyTotals()
@@ -36,9 +38,11 @@ export function MensualPage() {
 
   return (
     <div>
+      <PageTour id="mensual" />
       <PageHeader
         title="Mensual"
         subtitle="Los traspasos no son consumo: no cuentan en el flujo neto."
+        onHelp={() => showTour('mensual')}
         action={
           <Select className="w-auto" value={month} onChange={(e) => setMonth(e.target.value)}>
             {months.map((m) => (
