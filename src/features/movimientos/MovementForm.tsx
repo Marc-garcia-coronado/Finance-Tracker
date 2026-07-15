@@ -108,13 +108,7 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Fecha" htmlFor="date" error={errors.date?.message}>
-          <Input
-            id="date"
-            type="date"
-            className="appearance-none"
-            invalid={!!errors.date}
-            {...register('date')}
-          />
+          <Input id="date" type="date" invalid={!!errors.date} {...register('date')} />
         </Field>
         <Field label="Importe (€)" htmlFor="amount" error={errors.amount?.message}>
           <Input

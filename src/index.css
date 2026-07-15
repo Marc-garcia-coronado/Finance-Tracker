@@ -34,6 +34,22 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* iOS/WebKit renderiza el valor del input date pegado arriba-izquierda al
+   usar appearance:none con una altura fija. Lo centramos verticalmente dentro
+   de la altura de .input (h-11 = 44px; interior 42px descontando bordes). */
+input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input[type='date']::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+  line-height: 2.625rem;
+}
+input[type='date']::-webkit-datetime-edit {
+  line-height: 2.625rem;
+}
+
 @layer components {
   .card {
     @apply rounded-2xl border border-slate-200/70 bg-white
