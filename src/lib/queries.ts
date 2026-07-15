@@ -116,7 +116,7 @@ async function loadAccountsDecrypted(
 
 async function loadLedgerLines(key: CryptoKey): Promise<DecryptedLine[]> {
   const [eRes, lRes] = await Promise.all([
-    supabase.from('entries').select('id, occurred_on, kind, voided_at'),
+    supabase.from('entries').select('id, occurred_on, kind, voided_at, voids_entry_id'),
     supabase.from('entry_lines').select('entry_id, account_id, amount_enc, amount_cents'),
   ])
   if (eRes.error) throw new Error(eRes.error.message)
@@ -126,7 +126,11 @@ async function loadLedgerLines(key: CryptoKey): Promise<DecryptedLine[]> {
   const out: DecryptedLine[] = []
   for (const l of lRes.data ?? []) {
     const e = meta.get(l.entry_id)
-    if (!e || e.voided_at) continue
+    // Excluye el par completo de una anulación: el movimiento original (marcado
+    // con voided_at) Y su asiento inverso (marcado con voids_entry_id). Contar
+    // solo uno de los dos dejaría un neto espurio (p. ej. una categoría de gasto
+    // en negativo) en balances y totales mensuales.
+    if (!e || e.voided_at || e.voids_entry_id) continue
     const cents = l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0)
     out.push({ account_id: l.account_id, kind: e.kind, month: e.occurred_on.slice(0, 7), cents })
   }
