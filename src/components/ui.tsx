@@ -52,7 +52,7 @@ type FieldProps = {
 
 export function Field({ label, htmlFor, error, hint, children }: FieldProps) {
   return (
-    <div>
+    <div className="min-w-0">
       <label htmlFor={htmlFor} className="label">
         {label}
       </label>
