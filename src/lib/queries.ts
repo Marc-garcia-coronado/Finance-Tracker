@@ -11,7 +11,7 @@ import { monthRange, todayISO } from './dates'
 import { requireSessionKey } from './crypto/session'
 import { decryptCents, decryptString, encryptCents, encryptString } from './crypto/webcrypto'
 import type { Enums, Tables } from './database.types'
-import type { MonthlyTotalRow } from './metrics'
+import { netWorthSeries, type MonthlyTotalRow, type NetWorthPoint } from './metrics'
 
 // ---------------------------------------------------------------------------
 // Tipos de filas (versión DESCIFRADA: lo que ven los componentes).
@@ -76,6 +76,7 @@ export const qk = {
   recurring: ['recurring'] as const,
   balances: ['balances'] as const,
   monthly: ['monthly_totals'] as const,
+  netWorth: ['net_worth'] as const,
   entries: (filters: EntryFilters) => ['entries', filters] as const,
 }
 
@@ -83,6 +84,7 @@ function invalidateLedger(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['entries'] })
   qc.invalidateQueries({ queryKey: qk.balances })
   qc.invalidateQueries({ queryKey: qk.monthly })
+  qc.invalidateQueries({ queryKey: qk.netWorth })
 }
 
 async function requireUserId(): Promise<string> {
@@ -282,6 +284,21 @@ export function useMonthlyTotals(): UseQueryResult<MonthlyTotal[]> {
           })
       }
       return [...map.values()]
+    },
+  })
+}
+
+// Patrimonio neto a fin de cada mes (suma acumulada de las cuentas de activo).
+export function useNetWorthHistory(): UseQueryResult<NetWorthPoint[]> {
+  return useQuery({
+    queryKey: qk.netWorth,
+    queryFn: async () => {
+      const key = requireSessionKey()
+      const [accts, lines] = await Promise.all([loadAccountsDecrypted(key), loadLedgerLines(key)])
+      const assetIds = new Set(
+        [...accts].filter(([, a]) => a.type === 'asset').map(([id]) => id),
+      )
+      return netWorthSeries(lines, assetIds)
     },
   })
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   monthlyConsumo,
   monthsToTarget,
+  netWorthSeries,
   savingsRate,
   yearConsumo,
   type MonthlyTotalRow,
@@ -50,6 +51,52 @@ describe('savingsRate', () => {
   })
   it('0 si no hay ingresos', () => {
     expect(savingsRate({ incomeCents: 0, expenseCents: 100, netCents: -100 })).toBe(0)
+  })
+})
+
+describe('netWorthSeries', () => {
+  const assets = new Set(['bank', 'fund'])
+  type L = { account_id: string; month: string; cents: number }
+
+  it('acumula el saldo de las cuentas de activo a fin de cada mes', () => {
+    const lines: L[] = [
+      { account_id: 'bank', month: '2026-01', cents: 100000 }, // +1000
+      { account_id: 'bank', month: '2026-02', cents: -30000 }, // -300
+      { account_id: 'fund', month: '2026-03', cents: 50000 }, // +500
+    ]
+    const s = netWorthSeries(lines, assets, '2026-03')
+    expect(s).toEqual([
+      { month: '2026-01', cents: 100000 },
+      { month: '2026-02', cents: 70000 },
+      { month: '2026-03', cents: 120000 },
+    ])
+  })
+
+  it('mantiene el total anterior en meses sin movimientos (línea plana)', () => {
+    const lines: L[] = [{ account_id: 'bank', month: '2026-01', cents: 100000 }]
+    const s = netWorthSeries(lines, assets, '2026-03')
+    expect(s.map((p) => p.cents)).toEqual([100000, 100000, 100000])
+    expect(s.map((p) => p.month)).toEqual(['2026-01', '2026-02', '2026-03'])
+  })
+
+  it('ignora las cuentas que no son de activo', () => {
+    const lines: L[] = [
+      { account_id: 'bank', month: '2026-01', cents: 100000 },
+      { account_id: 'ocio', month: '2026-01', cents: 20000 }, // gasto, no activo
+    ]
+    const s = netWorthSeries(lines, assets, '2026-01')
+    expect(s).toEqual([{ month: '2026-01', cents: 100000 }])
+  })
+
+  it('cruza el salto de año de diciembre a enero', () => {
+    const lines: L[] = [{ account_id: 'bank', month: '2025-12', cents: 100000 }]
+    const s = netWorthSeries(lines, assets, '2026-02')
+    expect(s.map((p) => p.month)).toEqual(['2025-12', '2026-01', '2026-02'])
+    expect(s.map((p) => p.cents)).toEqual([100000, 100000, 100000])
+  })
+
+  it('serie vacía si no hay líneas de activo', () => {
+    expect(netWorthSeries([], assets, '2026-03')).toEqual([])
   })
 })
 

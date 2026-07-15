@@ -8,6 +8,7 @@
 // Todo en céntimos enteros.
 // ---------------------------------------------------------------------------
 import type { Enums, Tables } from './database.types'
+import { currentMonthKey } from './dates'
 
 type Account = Tables<'accounts'>
 
@@ -127,6 +128,48 @@ export function necessitiesFloorCents(
   return recurring
     .filter((r) => r.is_active && r.to_account_id === necessitiesAccountId)
     .reduce((s, r) => s + r.amount_cents, 0)
+}
+
+// ---------------------------------------------------------------------------
+// Patrimonio neto histórico
+// ---------------------------------------------------------------------------
+export type NetWorthPoint = { month: string; cents: number }
+
+// Mes siguiente a un 'YYYY-MM' (maneja el salto de diciembre a enero).
+function nextMonthKey(m: string): string {
+  const [y, mo] = m.split('-').map(Number) as [number, number]
+  return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, '0')}`
+}
+
+// Serie de patrimonio a fin de cada mes: suma acumulada de las líneas de las
+// cuentas de activo (assetIds). Las líneas ya vienen sin anulaciones y con los
+// ajustes incluidos (loadLedgerLines). Rellena los meses sin movimientos con el
+// total anterior (línea plana, no cae a 0) y extiende la serie hasta endMonth
+// para que llegue "hasta hoy" aunque no haya movimientos recientes.
+export function netWorthSeries(
+  lines: { account_id: string; month: string; cents: number }[],
+  assetIds: Set<string>,
+  endMonth: string = currentMonthKey(),
+): NetWorthPoint[] {
+  const deltaByMonth = new Map<string, number>()
+  let minMonth: string | null = null
+  let maxDataMonth: string | null = null
+  for (const l of lines) {
+    if (!assetIds.has(l.account_id)) continue
+    deltaByMonth.set(l.month, (deltaByMonth.get(l.month) ?? 0) + l.cents)
+    if (!minMonth || l.month < minMonth) minMonth = l.month
+    if (!maxDataMonth || l.month > maxDataMonth) maxDataMonth = l.month
+  }
+  if (!minMonth) return []
+
+  const end = endMonth > maxDataMonth! ? endMonth : maxDataMonth!
+  const out: NetWorthPoint[] = []
+  let running = 0
+  for (let m = minMonth; m <= end; m = nextMonthKey(m)) {
+    running += deltaByMonth.get(m) ?? 0
+    out.push({ month: m, cents: running })
+  }
+  return out
 }
 
 // Meses estimados para cubrir lo que falta a un ritmo mensual.
