@@ -18,7 +18,8 @@ import { Stat } from '@/components/Stat'
 import { ProgressBar } from '@/components/ProgressBar'
 import { ErrorState, LoadingState } from '@/components/states'
 import { formatEuro, centsToEuro } from '@/lib/money'
-import { currentYear } from '@/lib/dates'
+import { currentMonthKey, currentYear } from '@/lib/dates'
+import { BudgetCard } from '@/features/mensual/BudgetCard'
 import {
   monthsToTarget,
   necessitiesFloorCents,
@@ -127,6 +128,8 @@ export function DashboardPage() {
         />
         <Stat label="Tasa de ahorro" value={`${Math.round(rate * 100)}%`} hint="Flujo neto / ingresos" />
       </div>
+
+      <BudgetCard month={currentMonthKey()} />
 
       {/* Gráfico mensual */}
       <Card className="p-4">

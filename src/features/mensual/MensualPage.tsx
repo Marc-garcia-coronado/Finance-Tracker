@@ -13,6 +13,7 @@ import {
 } from '@/lib/metrics'
 import { useMonthlyTotals } from '@/lib/queries'
 import { PageTour } from '@/features/onboarding/PageTour'
+import { BudgetCard } from './BudgetCard'
 import { showTour } from '@/features/onboarding/tourStorage'
 
 export function MensualPage() {
@@ -70,6 +71,8 @@ export function MensualPage() {
               tone={consumo.netCents >= 0 ? 'positive' : 'negative'}
             />
           </div>
+
+          <BudgetCard month={month} />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <CategoryTable title="Ingresos por categoría" rows={ingresos} totalCents={consumo.incomeCents} />

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  budgetVsActual,
   monthlyConsumo,
   monthsToTarget,
   netWorthSeries,
@@ -97,6 +98,75 @@ describe('netWorthSeries', () => {
 
   it('serie vacía si no hay líneas de activo', () => {
     expect(netWorthSeries([], assets, '2026-03')).toEqual([])
+  })
+})
+
+describe('budgetVsActual', () => {
+  const acc = (name: string, type: 'expense' | 'asset' | 'income', over = {}) => ({
+    name,
+    type,
+    is_budget_bucket: true,
+    is_archived: false,
+    ...over,
+  })
+  const accountsById = new Map([
+    ['nec', acc('Necesidades', 'expense')],
+    ['ocio', acc('Ocio', 'expense')],
+    ['extra', acc('Extra', 'expense')],
+    ['inv', acc('Inversión', 'asset')],
+    ['fondo', acc('Fondo', 'asset')],
+    ['coche', acc('Coche', 'asset')],
+    ['arch', acc('Archivada', 'expense', { is_archived: true })],
+    ['nob', acc('No bucket', 'expense', { is_budget_bucket: false })],
+  ])
+  // Base 2000 €: nec 20 % = 400 €, ocio 15 % = 300 €, extra 5 % = 100 €,
+  // inv 30 % = 600 €, fondo 20 % = 400 €, coche 10 % = 200 €.
+  const allocations = [
+    { account_id: 'nec', percent: 20 },
+    { account_id: 'ocio', percent: 15 },
+    { account_id: 'extra', percent: 5 },
+    { account_id: 'inv', percent: 30 },
+    { account_id: 'fondo', percent: 20 },
+    { account_id: 'coche', percent: 10 },
+    { account_id: 'arch', percent: 0 },
+    { account_id: 'nob', percent: 0 },
+  ]
+  const totals: MT[] = [
+    mt({ account_id: 'nec', type: 'expense', total_cents: 10000 }), // 100 € de 400 € → ok
+    mt({ account_id: 'ocio', type: 'expense', total_cents: 27000 }), // 270 € de 300 € → near
+    mt({ account_id: 'extra', type: 'expense', total_cents: 12000 }), // 120 € de 100 € → over
+    mt({ account_id: 'inv', type: 'asset', total_cents: 60000 }), // 600 € de 600 € → done
+    mt({ account_id: 'fondo', type: 'asset', total_cents: 10000 }), // 100 € de 400 € → pending
+    mt({ account_id: 'coche', type: 'asset', total_cents: -5000 }), // retirada → 0 %
+    mt({ month: '2026-05', account_id: 'nec', type: 'expense', total_cents: 99999 }), // otro mes
+  ]
+  const rows = budgetVsActual({ allocations, accountsById, totals, month: '2026-06', baseCents: 200000 })
+  const byId = Object.fromEntries(rows.map((r) => [r.accountId, r]))
+
+  it('calcula asignado y real del mes', () => {
+    expect(byId.nec).toMatchObject({ budgetCents: 40000, actualCents: 10000, status: 'ok' })
+  })
+  it('estados de gasto: near entre 80 y 100 %, over al pasarse', () => {
+    expect(byId.ocio?.status).toBe('near')
+    expect(byId.extra?.status).toBe('over')
+    expect(byId.extra?.ratio).toBeCloseTo(1.2)
+  })
+  it('estados de ahorro: done al llegar, pending si falta, 0 % con salida neta', () => {
+    expect(byId.inv?.status).toBe('done')
+    expect(byId.fondo?.status).toBe('pending')
+    expect(byId.coche).toMatchObject({ ratio: 0, status: 'pending', actualCents: -5000 })
+  })
+  it('ignora buckets archivados o que no son bucket', () => {
+    expect(byId.arch).toBeUndefined()
+    expect(byId.nob).toBeUndefined()
+  })
+  it('ordena gasto primero y por % descendente', () => {
+    expect(rows.map((r) => r.accountId)).toEqual(['nec', 'ocio', 'extra', 'inv', 'fondo', 'coche'])
+  })
+  it('con base 0 el asignado es 0', () => {
+    const r = budgetVsActual({ allocations, accountsById, totals, month: '2026-06', baseCents: 0 })
+    expect(r.every((x) => x.budgetCents === 0)).toBe(true)
+    expect(r.find((x) => x.accountId === 'nec')?.status).toBe('over')
   })
 })
 
