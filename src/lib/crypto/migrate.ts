@@ -4,6 +4,7 @@
 // que ya esté cifrado, así que es seguro reintentarla.
 // ---------------------------------------------------------------------------
 import { supabase } from '../supabase'
+import { fetchAll } from '../fetchAll'
 import { encryptCents, encryptString, isEncrypted } from './webcrypto'
 import type { TablesUpdate } from '../database.types'
 
@@ -28,9 +29,10 @@ export async function migratePlaintext(key: CryptoKey, onProgress?: MigrateProgr
 
   // entries.description
   steps.push(async () => {
-    const { data, error } = await supabase.from('entries').select('id, description')
-    if (error) throw new Error(error.message)
-    for (const row of data ?? []) {
+    const data = await fetchAll((from, to) =>
+      supabase.from('entries').select('id, description').order('id').range(from, to),
+    )
+    for (const row of data) {
       if (!row.description || isEncrypted(row.description)) continue
       const { error: e } = await supabase
         .from('entries')
@@ -42,12 +44,17 @@ export async function migratePlaintext(key: CryptoKey, onProgress?: MigrateProgr
 
   // entry_lines.amount_cents -> amount_enc
   steps.push(async () => {
-    const { data, error } = await supabase
-      .from('entry_lines')
-      .select('id, amount_cents, amount_enc')
-      .is('amount_enc', null)
-    if (error) throw new Error(error.message)
-    for (const l of data ?? []) {
+    // Se lee TODO antes de actualizar: al cifrar, las filas salen del filtro
+    // `amount_enc is null` y paginar a la vez que se escribe saltaría filas.
+    const data = await fetchAll((from, to) =>
+      supabase
+        .from('entry_lines')
+        .select('id, amount_cents, amount_enc')
+        .is('amount_enc', null)
+        .order('id')
+        .range(from, to),
+    )
+    for (const l of data) {
       if (l.amount_cents == null) continue
       const { error: e } = await supabase
         .from('entry_lines')
