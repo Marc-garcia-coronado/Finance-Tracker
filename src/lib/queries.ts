@@ -12,7 +12,15 @@ import { monthRange, todayISO } from './dates'
 import { requireSessionKey } from './crypto/session'
 import { decryptCents, decryptString, encryptCents, encryptString } from './crypto/webcrypto'
 import type { Enums, Tables } from './database.types'
-import { netWorthSeries, type MonthlyTotalRow, type NetWorthPoint } from './metrics'
+import type { MonthlyTotalRow, NetWorthPoint } from './metrics'
+import {
+  balancesFromLedger,
+  monthlyTotalsFromLedger,
+  netWorthFromLedger,
+  type Balance,
+  type Ledger,
+  type LedgerLine,
+} from './ledger'
 
 // ---------------------------------------------------------------------------
 // Tipos de filas (versión DESCIFRADA: lo que ven los componentes).
@@ -47,12 +55,7 @@ export type Recurring = {
   is_active: boolean
   created_at: string
 }
-export type Balance = {
-  account_id: string
-  name: string
-  type: Enums<'account_type'>
-  balance_cents: number
-}
+export type { Balance }
 export type MonthlyTotal = MonthlyTotalRow
 
 export type EntryWithLines = {
@@ -75,17 +78,13 @@ export const qk = {
   allocations: ['allocations'] as const,
   goals: ['goals'] as const,
   recurring: ['recurring'] as const,
-  balances: ['balances'] as const,
-  monthly: ['monthly_totals'] as const,
-  netWorth: ['net_worth'] as const,
+  ledger: ['ledger'] as const,
   entries: (filters: EntryFilters) => ['entries', filters] as const,
 }
 
 function invalidateLedger(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['entries'] })
-  qc.invalidateQueries({ queryKey: qk.balances })
-  qc.invalidateQueries({ queryKey: qk.monthly })
-  qc.invalidateQueries({ queryKey: qk.netWorth })
+  qc.invalidateQueries({ queryKey: qk.ledger })
 }
 
 async function requireUserId(): Promise<string> {
@@ -98,27 +97,13 @@ async function requireUserId(): Promise<string> {
 // ---------------------------------------------------------------------------
 // Agregación del ledger en cliente (sustituye a las vistas SQL eliminadas).
 // ---------------------------------------------------------------------------
-type DecryptedLine = {
-  account_id: string
-  kind: Enums<'entry_kind'>
-  month: string // 'YYYY-MM'
-  cents: number
-}
-
-async function loadAccountsDecrypted(
-  key: CryptoKey,
-): Promise<Map<string, { name: string; type: Enums<'account_type'> }>> {
-  const { data, error } = await supabase.from('accounts').select('id, name, type')
-  if (error) throw new Error(error.message)
-  const m = new Map<string, { name: string; type: Enums<'account_type'> }>()
-  for (const a of data ?? []) {
-    m.set(a.id, { name: await decryptString(key, a.name), type: a.type })
-  }
-  return m
-}
-
-async function loadLedgerLines(key: CryptoKey): Promise<DecryptedLine[]> {
-  const [entries, lines] = await Promise.all([
+// Carga y descifra el ledger completo. Se hace UNA vez (query qk.ledger) y
+// saldos, totales mensuales y patrimonio se derivan con `select`.
+async function loadLedger(key: CryptoKey): Promise<Ledger> {
+  const [accountRows, entries, lines] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase.from('accounts').select('id, name, type').order('id').range(from, to),
+    ),
     fetchAll((from, to) =>
       supabase
         .from('entries')
@@ -136,18 +121,29 @@ async function loadLedgerLines(key: CryptoKey): Promise<DecryptedLine[]> {
   ])
 
   const meta = new Map(entries.map((e) => [e.id, e]))
-  const out: DecryptedLine[] = []
-  for (const l of lines) {
-    const e = meta.get(l.entry_id)
-    // Excluye el par completo de una anulación: el movimiento original (marcado
-    // con voided_at) Y su asiento inverso (marcado con voids_entry_id). Contar
-    // solo uno de los dos dejaría un neto espurio (p. ej. una categoría de gasto
-    // en negativo) en balances y totales mensuales.
-    if (!e || e.voided_at || e.voids_entry_id) continue
-    const cents = l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0)
-    out.push({ account_id: l.account_id, kind: e.kind, month: e.occurred_on.slice(0, 7), cents })
-  }
-  return out
+  // Descifrado en paralelo: WebCrypto es asíncrono y encadenar un await por
+  // línea desaprovecha la concurrencia.
+  const decrypted = await Promise.all(
+    lines.map(async (l): Promise<LedgerLine | null> => {
+      const e = meta.get(l.entry_id)
+      // Excluye el par completo de una anulación: el movimiento original (marcado
+      // con voided_at) Y su asiento inverso (marcado con voids_entry_id). Contar
+      // solo uno de los dos dejaría un neto espurio (p. ej. una categoría de gasto
+      // en negativo) en balances y totales mensuales.
+      if (!e || e.voided_at || e.voids_entry_id) return null
+      const cents = l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0)
+      return { account_id: l.account_id, kind: e.kind, month: e.occurred_on.slice(0, 7), cents }
+    }),
+  )
+  const accounts = await Promise.all(
+    accountRows.map(async (a) => ({ id: a.id, name: await decryptString(key, a.name), type: a.type })),
+  )
+  return { accounts, lines: decrypted.filter((l): l is LedgerLine => l !== null) }
+}
+
+const ledgerQuery = {
+  queryKey: qk.ledger,
+  queryFn: () => loadLedger(requireSessionKey()),
 }
 
 // ---------------------------------------------------------------------------
@@ -254,64 +250,20 @@ export function useRecurring(): UseQueryResult<Recurring[]> {
   })
 }
 
+// Los tres comparten qk.ledger: react-query hace una sola carga y cada hook
+// deriva su vista. Los `select` son funciones de módulo (referencia estable),
+// así que solo se recalculan cuando cambia el ledger.
 export function useBalances(): UseQueryResult<Balance[]> {
-  return useQuery({
-    queryKey: qk.balances,
-    queryFn: async () => {
-      const key = requireSessionKey()
-      const [accts, lines] = await Promise.all([loadAccountsDecrypted(key), loadLedgerLines(key)])
-      const sums = new Map<string, number>()
-      for (const l of lines) sums.set(l.account_id, (sums.get(l.account_id) ?? 0) + l.cents)
-      const out: Balance[] = []
-      for (const [id, a] of accts) {
-        out.push({ account_id: id, name: a.name, type: a.type, balance_cents: sums.get(id) ?? 0 })
-      }
-      return out
-    },
-  })
+  return useQuery({ ...ledgerQuery, select: balancesFromLedger })
 }
 
 export function useMonthlyTotals(): UseQueryResult<MonthlyTotal[]> {
-  return useQuery({
-    queryKey: qk.monthly,
-    queryFn: async () => {
-      const key = requireSessionKey()
-      const [accts, lines] = await Promise.all([loadAccountsDecrypted(key), loadLedgerLines(key)])
-      const map = new Map<string, MonthlyTotalRow>()
-      for (const l of lines) {
-        if (l.kind === 'adjustment') continue // los ajustes no son consumo del mes
-        const a = accts.get(l.account_id)
-        if (!a) continue
-        const k = `${l.month}|${l.account_id}`
-        const cur = map.get(k)
-        if (cur) cur.total_cents += l.cents
-        else
-          map.set(k, {
-            month: l.month,
-            account_id: l.account_id,
-            name: a.name,
-            type: a.type,
-            total_cents: l.cents,
-          })
-      }
-      return [...map.values()]
-    },
-  })
+  return useQuery({ ...ledgerQuery, select: monthlyTotalsFromLedger })
 }
 
 // Patrimonio neto a fin de cada mes (suma acumulada de las cuentas de activo).
 export function useNetWorthHistory(): UseQueryResult<NetWorthPoint[]> {
-  return useQuery({
-    queryKey: qk.netWorth,
-    queryFn: async () => {
-      const key = requireSessionKey()
-      const [accts, lines] = await Promise.all([loadAccountsDecrypted(key), loadLedgerLines(key)])
-      const assetIds = new Set(
-        [...accts].filter(([, a]) => a.type === 'asset').map(([id]) => id),
-      )
-      return netWorthSeries(lines, assetIds)
-    },
-  })
+  return useQuery({ ...ledgerQuery, select: netWorthFromLedger })
 }
 
 export type EntryFilters = {
@@ -576,7 +528,7 @@ export function useSaveAccount() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.accounts })
-      qc.invalidateQueries({ queryKey: qk.balances })
+      qc.invalidateQueries({ queryKey: qk.ledger })
     },
   })
 }
