@@ -1,5 +1,6 @@
-import { useState, type ComponentType, type SVGProps } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useAutoRecurring } from '@/features/recurrentes/useAutoRecurring'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { Modal } from './Modal'
@@ -47,6 +48,46 @@ const DESKTOP_NAV: NavItem[] = [
   { to: '/patrimonio', label: 'Patrimonio', icon: ChartBarIcon },
   { to: '/config', label: 'Configuración', icon: SettingsIcon },
 ]
+
+// Aviso de la generación automática de recurrentes al abrir la app.
+function AutoRecurringNotice() {
+  const state = useAutoRecurring()
+  const [dismissed, setDismissed] = useState(false)
+  if (dismissed) return null
+
+  let body: ReactNode = null
+  let tone = ''
+  if (state.status === 'done' && state.created > 0) {
+    tone = 'border-indigo-200 bg-indigo-50 text-indigo-900'
+    body = (
+      <>
+        {state.created === 1
+          ? 'Se ha creado 1 movimiento recurrente pendiente.'
+          : `Se han creado ${state.created} movimientos recurrentes pendientes.`}{' '}
+        <Link to="/movimientos" className="font-medium underline" onClick={() => setDismissed(true)}>
+          Ver
+        </Link>
+      </>
+    )
+  } else if (state.status === 'error') {
+    tone = 'border-rose-200 bg-rose-50 text-rose-800'
+    body = `No se pudieron generar los recurrentes: ${state.message}`
+  }
+  if (!body) return null
+
+  return (
+    <div role="status" className={cn('mb-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm', tone)}>
+      <p className="flex-1">{body}</p>
+      <button
+        onClick={() => setDismissed(true)}
+        aria-label="Cerrar aviso"
+        className="-my-1 rounded-lg px-2 py-1 text-base leading-none opacity-60 hover:opacity-100"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
 
 export function AppLayout() {
   const navigate = useNavigate()
@@ -106,6 +147,7 @@ export function AppLayout() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
+        <AutoRecurringNotice />
         <Outlet />
       </main>
 
