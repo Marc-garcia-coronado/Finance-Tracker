@@ -236,6 +236,7 @@ function RecurringForm({
   }, [kind, setValue, isFirst])
 
   async function onSubmit(v: FormValues) {
+    const reactivated = template != null && !template.is_active && v.is_active
     try {
       await save.mutateAsync({
         id: template?.id,
@@ -246,7 +247,10 @@ function RecurringForm({
         kind: v.kind,
         cadence: v.cadence,
         day_of_month: v.day_of_month,
-        next_run_on: template?.next_run_on ?? todayISO(),
+        // Al reactivar una plantilla se empieza desde hoy: si no, la generación
+        // automática crearía todos los meses en los que estuvo desactivada.
+        next_run_on:
+          template && !reactivated ? template.next_run_on : todayISO(),
         is_active: v.is_active,
       })
       onDone()
