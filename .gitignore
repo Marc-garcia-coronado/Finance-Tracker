@@ -28,6 +28,9 @@ dist-ssr
 *.sln
 *.sw?
 
+# Claude Code: settings.json se versiona; los ajustes locales no.
+.claude/settings.local.json
+
 # Supabase local
 supabase/.branches
 supabase/.temp
