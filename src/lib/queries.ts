@@ -373,12 +373,15 @@ export function useEntriesForSearch(
   return useQuery({
     queryKey: ['entries', 'search', filters],
     enabled,
-    queryFn: async () => {
-      const data = await fetchAll((from, to) => entriesQuery(filters).range(from, to))
-      const key = requireSessionKey()
-      return Promise.all(data.map((e) => decryptEntryRow(key, e)))
-    },
+    queryFn: () => fetchAllEntries(filters),
   })
+}
+
+// Todos los movimientos que cumplen los filtros, descifrados (búsqueda y exportación).
+export async function fetchAllEntries(filters: EntryQueryFilters): Promise<EntryWithLines[]> {
+  const data = await fetchAll((from, to) => entriesQuery(filters).range(from, to))
+  const key = requireSessionKey()
+  return Promise.all(data.map((e) => decryptEntryRow(key, e)))
 }
 
 // ---------------------------------------------------------------------------

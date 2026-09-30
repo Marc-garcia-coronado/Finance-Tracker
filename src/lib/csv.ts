@@ -95,3 +95,15 @@ export function parseCsv(input: string, delimiter?: Delimiter): ParsedCsv {
     rows: rows.map((r) => r.map((c) => c.trim())),
   }
 }
+
+// Serializa a CSV (inverso de parseCsv). Entrecomilla los campos que contienen
+// el delimitador, comillas o saltos de línea, y añade el BOM para que Excel
+// abra bien los acentos. Por defecto ';' (Excel español: la coma es decimal).
+export function toCsv(headers: string[], rows: string[][], delimiter: Delimiter = ';'): string {
+  const escape = (v: string) =>
+    v.includes(delimiter) || v.includes('"') || v.includes('\n') || v.includes('\r')
+      ? `"${v.replace(/"/g, '""')}"`
+      : v
+  const lines = [headers, ...rows].map((r) => r.map(escape).join(delimiter))
+  return '﻿' + lines.join('\r\n') + '\r\n'
+}

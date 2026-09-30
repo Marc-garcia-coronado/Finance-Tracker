@@ -6,6 +6,7 @@ import { Money } from '@/components/Money'
 import { cn } from '@/lib/cn'
 import { formatDate } from '@/lib/dates'
 import { parseCsv } from '@/lib/csv'
+import { saveFile } from '@/lib/saveFile'
 import {
   buildImportRows,
   categoryAccountType,
@@ -65,6 +66,10 @@ export function ImportMovementsModal({
     [accounts.data],
   )
   const assets = useMemo(() => active.filter((a) => a.type === 'asset'), [active])
+  const assetByName = useMemo(
+    () => new Map(assets.map((a) => [normalizeText(a.name), a.id])),
+    [assets],
+  )
 
   function reset() {
     setStep('upload')
@@ -166,7 +171,10 @@ export function ImportMovementsModal({
         continue
       }
       const categoryId = m.accountId === NEW ? newIds[key] : m.accountId
-      if (!categoryId || !principalId || categoryId === principalId) {
+      // Columna Cuenta (CSV exportado por la app): si coincide con una cuenta de
+      // activo, esa fila usa esa cuenta; si no, la cuenta principal del modal.
+      const rowAccountId = (r.cuenta && assetByName.get(normalizeText(r.cuenta))) || principalId
+      if (!categoryId || !rowAccountId || categoryId === rowAccountId) {
         unresolved++
         continue
       }
@@ -175,8 +183,8 @@ export function ImportMovementsModal({
         kind: m.kind,
         date: r.dateISO,
         description: r.concepto,
-        fromAccountId: isIncome ? categoryId : principalId,
-        toAccountId: isIncome ? principalId : categoryId,
+        fromAccountId: isIncome ? categoryId : rowAccountId,
+        toAccountId: isIncome ? rowAccountId : categoryId,
         amountCents: r.amountCents,
       })
     }
@@ -256,6 +264,7 @@ export function ImportMovementsModal({
           rowCount={rows.length}
           errorCount={errorCount}
           duplicateCount={duplicates.size}
+          hasAccountColumn={rows.some((r) => r.cuenta !== '')}
           canContinue={mappingComplete}
           onBack={() => setStep('upload')}
           onContinue={() => setStep('confirm')}
@@ -346,13 +355,7 @@ function downloadTemplate() {
     '01/01/2026;Gasto;Ocio;Cine;12,50;Enero;2026\n' +
     '05/01/2026;Ingreso;Trabajo;Nómina;1800,00;Enero;2026\n' +
     '10/01/2026;Ahorro;Fondo emergencia;Traspaso mensual;200,00;Enero;2026\n'
-  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'plantilla-movimientos.csv'
-  a.click()
-  URL.revokeObjectURL(url)
+  void saveFile('plantilla-movimientos.csv', '\uFEFF' + content)
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +372,7 @@ function MapStep({
   rowCount,
   errorCount,
   duplicateCount,
+  hasAccountColumn,
   canContinue,
   onBack,
   onContinue,
@@ -383,6 +387,7 @@ function MapStep({
   rowCount: number
   errorCount: number
   duplicateCount: number
+  hasAccountColumn: boolean
   canContinue: boolean
   onBack: () => void
   onContinue: () => void
@@ -393,7 +398,11 @@ function MapStep({
         {rowCount} fila(s) · {errorCount} con error · {duplicateCount} duplicada(s)
       </p>
 
-      <Field label="Cuenta principal (eje de los movimientos)" htmlFor="principal">
+      <Field
+        label="Cuenta principal (eje de los movimientos)"
+        htmlFor="principal"
+        hint={hasAccountColumn ? 'Solo para las filas sin columna «Cuenta» o con una cuenta que no existe.' : undefined}
+      >
         <Select
           id="principal"
           value={principalId}

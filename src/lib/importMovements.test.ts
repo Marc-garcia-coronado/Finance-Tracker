@@ -43,7 +43,11 @@ describe('parseDate', () => {
 describe('detectColumns', () => {
   it('encuentra columnas tolerando acentos y "Importe (€)"', () => {
     const cols = detectColumns(['Fecha', 'Tipo', 'Categoría', 'Concepto', 'Importe (€)', 'Mes', 'Año'])
-    expect(cols).toEqual({ fecha: 0, tipo: 1, categoria: 2, concepto: 3, importe: 4 })
+    expect(cols).toEqual({ fecha: 0, tipo: 1, categoria: 2, concepto: 3, importe: 4, cuenta: -1 })
+  })
+  it('detecta la columna opcional Cuenta', () => {
+    const cols = detectColumns(['Fecha', 'Tipo', 'Categoría', 'Cuenta', 'Concepto', 'Importe (€)'])
+    expect(cols).toEqual({ fecha: 0, tipo: 1, categoria: 2, concepto: 4, importe: 5, cuenta: 3 })
   })
   it('devuelve null si falta una columna mínima', () => {
     expect(detectColumns(['Fecha', 'Categoría'])).toBeNull()
