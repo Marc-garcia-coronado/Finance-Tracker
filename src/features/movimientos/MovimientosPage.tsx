@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
-import { Button, Card, Select } from '@/components/ui'
+import { Button, Card, Input, Select } from '@/components/ui'
+import { SearchIcon } from '@/components/icons'
+import { matchesSearch } from '@/lib/search'
 import { Modal } from '@/components/Modal'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
@@ -9,9 +11,12 @@ import { formatDate, formatMonthLabel, recentMonths } from '@/lib/dates'
 import {
   useAccounts,
   useEntries,
+  useEntriesForSearch,
   useVoidEntry,
+  type Account,
   type EntryWithLines,
   type EntryFilters,
+  type EntryQueryFilters,
 } from '@/lib/queries'
 import { MovementForm } from './MovementForm'
 import { ImportMovementsModal } from './ImportMovementsModal'
@@ -34,19 +39,54 @@ const KIND_TEXT: Record<string, string> = {
   adjustment: 'Ajuste',
 }
 
+const ACCOUNT_GROUPS: { type: Account['type']; label: string }[] = [
+  { type: 'asset', label: 'Cuentas' },
+  { type: 'income', label: 'Ingresos' },
+  { type: 'expense', label: 'Categorías de gasto' },
+]
+
+// Valor que se actualiza `ms` después del último cambio.
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(t)
+  }, [value, ms])
+  return debounced
+}
+
 export function MovimientosPage() {
   const [open, setOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [month, setMonth] = useState<string>(MONTHS[0]!)
   const [kind, setKind] = useState<EntryFilters['kind']>('all')
+  const [accountId, setAccountId] = useState<string>('all')
+  const [hideVoided, setHideVoided] = useState(false)
+  const [searchInput, setSearchInput] = useState('')
   const [page, setPage] = useState(0)
 
+  const search = useDebounced(searchInput.trim(), 300)
+  const searching = search.length > 0
+  // La página vuelve a la 1 cuando cambia la búsqueda efectiva.
+  useEffect(() => setPage(0), [search])
+
+  const serverFilters: EntryQueryFilters = { month, kind, accountId, hideVoided }
   const accounts = useAccounts()
-  const entries = useEntries({ month, kind, page, pageSize: PAGE_SIZE })
+  const paged = useEntries({ ...serverFilters, page, pageSize: PAGE_SIZE }, !searching)
+  const all = useEntriesForSearch(serverFilters, searching)
   const voidEntry = useVoidEntry()
 
+  // Con búsqueda: filtrado y paginación en cliente sobre todos los movimientos.
+  const matches = useMemo(
+    () => (searching ? (all.data ?? []).filter((e) => matchesSearch(e.description, search)) : []),
+    [searching, all.data, search],
+  )
+  const active = searching ? all : paged
+  const rows = searching ? matches.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE) : (paged.data?.rows ?? [])
+  const count = searching ? matches.length : (paged.data?.count ?? 0)
+
   const byId = new Map((accounts.data ?? []).map((a) => [a.id, a.name]))
-  const totalPages = Math.max(1, Math.ceil((entries.data?.count ?? 0) / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
 
   function resetPageAnd(fn: () => void) {
     setPage(0)
@@ -78,7 +118,29 @@ export function MovimientosPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="relative mb-3">
+        <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <Input
+          type="search"
+          aria-label="Buscar movimientos"
+          placeholder="Buscar por concepto…"
+          className="pl-9 pr-9"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+        />
+        {searchInput && (
+          <button
+            type="button"
+            aria-label="Limpiar búsqueda"
+            onClick={() => setSearchInput('')}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-2 py-0.5 text-base leading-none text-slate-400 hover:text-slate-700"
+          >
+            ×
+          </button>
+        )}
+      </div>
+
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-slate-600">
           Mes
           <Select
@@ -110,29 +172,72 @@ export function MovimientosPage() {
             <option value="adjustment">Ajuste</option>
           </Select>
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          Cuenta
+          <Select
+            className="w-auto max-w-[14rem]"
+            value={accountId}
+            onChange={(e) => resetPageAnd(() => setAccountId(e.target.value))}
+          >
+            <option value="all">Todas</option>
+            {ACCOUNT_GROUPS.map((g) => {
+              const items = (accounts.data ?? [])
+                .filter((a) => a.type === g.type)
+                .sort((a, b) => Number(a.is_archived) - Number(b.is_archived))
+              if (items.length === 0) return null
+              return (
+                <optgroup key={g.type} label={g.label}>
+                  {items.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                      {a.is_archived ? ' (archivada)' : ''}
+                    </option>
+                  ))}
+                </optgroup>
+              )
+            })}
+          </Select>
+        </label>
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+            checked={hideVoided}
+            onChange={(e) => resetPageAnd(() => setHideVoided(e.target.checked))}
+          />
+          Ocultar anulados
+        </label>
       </div>
 
-      {entries.isLoading || accounts.isLoading ? (
-        <LoadingState />
-      ) : entries.isError ? (
-        <ErrorState error={entries.error} onRetry={() => entries.refetch()} />
-      ) : (entries.data?.rows.length ?? 0) === 0 ? (
-        <EmptyState
-          title="No hay movimientos"
-          description="Prueba a cambiar los filtros o registra uno nuevo."
-          action={<Button onClick={() => setOpen(true)}>Nuevo movimiento</Button>}
-        />
+      {active.isLoading || accounts.isLoading ? (
+        <LoadingState label={searching ? 'Buscando…' : undefined} />
+      ) : active.isError ? (
+        <ErrorState error={active.error} onRetry={() => active.refetch()} />
+      ) : rows.length === 0 ? (
+        searching ? (
+          <EmptyState
+            title={`Ningún movimiento coincide con «${search}»`}
+            description="Prueba con otras palabras o cambia los filtros."
+          />
+        ) : (
+          <EmptyState
+            title="No hay movimientos"
+            description="Prueba a cambiar los filtros o registra uno nuevo."
+            action={<Button onClick={() => setOpen(true)}>Nuevo movimiento</Button>}
+          />
+        )
       ) : (
         <>
           <Card className="divide-y divide-slate-100">
-            {entries.data!.rows.map((e) => (
+            {rows.map((e) => (
               <Row key={e.id} entry={e} byId={byId} onVoid={onVoid} busy={voidEntry.isPending} />
             ))}
           </Card>
 
           <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
             <span>
-              {entries.data!.count} movimiento(s) · página {page + 1} de {totalPages}
+              {count} movimiento(s){searching ? ` que coinciden con «${search}»` : ''} · página {page + 1}{' '}
+              de {totalPages}
             </span>
             <div className="flex gap-2">
               <Button
