@@ -105,10 +105,37 @@ para abrir offline; los datos siguen requiriendo red.
   [`.github/workflows/keepalive.yml`](./.github/workflows/keepalive.yml) hace un
   ping cada 3 días. Añade en el repo los secrets **`SUPABASE_URL`** y
   **`SUPABASE_ANON_KEY`** (Settings → Secrets and variables → Actions).
-- **No tiene backups.** Configura un export periódico: renombra
-  [`.github/workflows/backup.yml.example`](./.github/workflows/backup.yml.example)
-  a `backup.yml` y añade el secret **`SUPABASE_DB_URL`** (la connection string de
-  Postgres). Hace un `pg_dump` semanal y lo guarda como artifact.
+- **No tiene backups.** Ver [Backups](#backups).
+
+## Backups
+
+El workflow [`.github/workflows/backup.yml`](./.github/workflows/backup.yml) hace
+cada domingo un `pg_dump` del esquema `public`, lo comprime, lo **cifra con gpg
+(AES256)** y lo guarda como artifact 30 días. Se cifra porque el repo es público
+y los artifacts los puede descargar cualquier usuario de GitHub con sesión.
+
+**Configuración** (Settings → Secrets and variables → Actions):
+
+| Secret | Valor |
+| --- | --- |
+| `SUPABASE_DB_URL` | Supabase → Project Settings → Database → Connection string → **Session pooler** (la conexión directa es solo IPv6 y los runners de GitHub no la alcanzan) |
+| `BACKUP_PASSPHRASE` | Contraseña larga para cifrar el dump. Guárdala en tu gestor de contraseñas: sin ella el backup no se puede restaurar |
+
+**Lanzarlo a mano:** Actions → *Backup DB* → *Run workflow*. Hazlo siempre
+**antes de aplicar una migración** (p. ej. `migrations/001_e2ee.sql`).
+
+**Restaurar:**
+
+```bash
+# 1. Descarga el artifact db-backup desde la ejecución del workflow y descomprime el zip
+gpg -d backup-AAAAMMDD-HHMMSS.sql.gz.gpg | gunzip > backup.sql
+# 2. Aplícalo sobre una base de datos vacía (o un proyecto nuevo de Supabase)
+psql "$SUPABASE_DB_URL" -f backup.sql
+```
+
+> Con el cifrado E2EE activo, los importes, descripciones y nombres del dump van
+> cifrados con tu clave maestra: para leerlos en la app hace falta tu contraseña
+> o el código de recuperación, además de `BACKUP_PASSPHRASE`.
 
 ## Estructura
 

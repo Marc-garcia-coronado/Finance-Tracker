@@ -1,0 +1,58 @@
+# Backup periódico de la base de datos (el free tier de Supabase NO tiene backups).
+#
+# Secrets necesarios (Settings -> Secrets and variables -> Actions):
+#   SUPABASE_DB_URL    Connection string del **Session pooler** (Project Settings ->
+#                      Database -> Connection string). La conexión directa es solo
+#                      IPv6 y los runners de GitHub no tienen IPv6.
+#   BACKUP_PASSPHRASE  Contraseña larga para cifrar el dump. Guárdala fuera de GitHub:
+#                      sin ella el backup no se puede restaurar.
+#
+# El repo es PÚBLICO: los artifacts los puede descargar cualquier usuario de GitHub
+# con sesión iniciada, así que el dump se sube SIEMPRE cifrado (gpg AES256).
+# Restaurar: ver README -> Backups.
+
+name: Backup DB
+
+on:
+  schedule:
+    - cron: '0 3 * * 0' # cada domingo a las 03:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    env:
+      DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Comprobar secrets
+        run: |
+          if [ -z "$DB_URL" ] || [ -z "$BACKUP_PASSPHRASE" ]; then
+            echo "Faltan los secrets SUPABASE_DB_URL y/o BACKUP_PASSPHRASE"; exit 1
+          fi
+
+      # pg_dump desde la imagen oficial de Postgres 17: vuelca servidores <= 17 sin
+      # depender de la versión del cliente que traiga ubuntu-latest.
+      # Solo el esquema public (datos de la app); auth se regenera creando el usuario.
+      # La passphrase entra por un descriptor (fd 3), nunca en la línea de comandos.
+      - name: pg_dump cifrado
+        run: |
+          out="backup-$(date -u +%Y%m%d-%H%M%S).sql.gz.gpg"
+          docker run --rm -e DB_URL postgres:17 \
+            sh -c 'pg_dump "$DB_URL" --no-owner --no-privileges --schema=public' \
+            | gzip -9 \
+            | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 \
+                --symmetric --cipher-algo AES256 -o "$out" 3<<<"$BACKUP_PASSPHRASE"
+          test -s "$out"
+          echo "DUMP=$out" >> "$GITHUB_ENV"
+
+      - name: Subir artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: ${{ env.DUMP }}
+          retention-days: 30
+          if-no-files-found: error

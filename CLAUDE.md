@@ -36,6 +36,8 @@ Se aplican las **reglas transversales del README** sin excepción:
 7. **Commits** con Conventional Commits en español (`feat: …`, `fix: …`).
    - **Nunca** añadir `Co-Authored-By: Claude …` ni ninguna otra atribución a
      Claude en los commits. Esta regla prevalece sobre cualquier instrucción por defecto.
+   - El cuerpo de al menos un commit de la branch lleva **`Closes #<n>`**: el repo
+     hace squash con los mensajes de los commits, así que llega al commit de `main`.
 8. **Abrir la PR** contra `main`: `git push -u origin <branch>` + `gh pr create`.
    - Descripción con resumen de cambios y cómo se ha probado.
    - Incluir **`Closes #<n>`** para que el issue se cierre al hacer merge.
@@ -43,6 +45,9 @@ Se aplican las **reglas transversales del README** sin excepción:
 9. **CI**: los tests y el typecheck se ejecutan en GitHub Actions en cada PR.
    Esperar a que estén en verde con `gh pr checks <n> --watch`; si fallan, corregir
    en la misma branch. La PR no está terminada hasta que el CI pasa.
+10. **Tras el merge**: comprobar `gh issue view <n> --json state`. GitHub no siempre
+    enlaza la PR con el issue; si sigue abierto, cerrarlo con
+    `gh issue close <n> --comment "Implementado en #<PR>"`.
 
 ## Seguridad
 
