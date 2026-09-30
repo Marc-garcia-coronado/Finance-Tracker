@@ -111,6 +111,75 @@ export function recommendedAllocations(
     .sort((a, b) => b.percent - a.percent)
 }
 
+// ---------------------------------------------------------------------------
+// Presupuesto frente a real, por bucket y mes
+// ---------------------------------------------------------------------------
+//   - Bucket de gasto (expense): real = lo gastado en la categoría ese mes.
+//     ok < 80 % <= near <= 100 % < over.
+//   - Bucket de ahorro (asset): real = entrada neta en la cuenta ese mes
+//     (traspasos recibidos - retiradas). pending < 100 % <= done.
+export type BudgetStatus = 'ok' | 'near' | 'over' | 'pending' | 'done'
+
+export type BudgetRow = {
+  accountId: string
+  name: string
+  type: 'expense' | 'asset'
+  percent: number
+  budgetCents: number
+  actualCents: number
+  ratio: number // actual / asignado, >= 0 (puede pasar de 1)
+  status: BudgetStatus
+}
+
+export const BUDGET_NEAR_RATIO = 0.8
+
+export function budgetVsActual(args: {
+  allocations: { account_id: string; percent: number }[]
+  accountsById: Map<string, Pick<Account, 'name' | 'type' | 'is_budget_bucket' | 'is_archived'>>
+  totals: MonthlyTotal[]
+  month: string
+  baseCents: number
+}): BudgetRow[] {
+  const { allocations, accountsById, totals, month, baseCents } = args
+  const actualById = new Map<string, number>()
+  for (const t of totals) {
+    if (t.month === month) actualById.set(t.account_id, (actualById.get(t.account_id) ?? 0) + t.total_cents)
+  }
+
+  const rows: BudgetRow[] = []
+  for (const a of allocations) {
+    const acc = accountsById.get(a.account_id)
+    if (!acc || !acc.is_budget_bucket || acc.is_archived) continue
+    if (acc.type !== 'expense' && acc.type !== 'asset') continue
+
+    const budgetCents = Math.round((baseCents * a.percent) / 100)
+    const actualCents = actualById.get(a.account_id) ?? 0
+    const ratio = budgetCents > 0 ? Math.max(0, actualCents) / budgetCents : 0
+
+    let status: BudgetStatus
+    if (acc.type === 'expense') {
+      if (budgetCents <= 0) status = actualCents > 0 ? 'over' : 'ok'
+      else status = ratio > 1 ? 'over' : ratio >= BUDGET_NEAR_RATIO ? 'near' : 'ok'
+    } else {
+      status = budgetCents <= 0 || ratio >= 1 ? 'done' : 'pending'
+    }
+
+    rows.push({
+      accountId: a.account_id,
+      name: acc.name,
+      type: acc.type,
+      percent: a.percent,
+      budgetCents,
+      actualCents,
+      ratio,
+      status,
+    })
+  }
+
+  // Primero gasto, luego ahorro; dentro de cada grupo, de mayor a menor %.
+  return rows.sort((x, y) => (x.type === y.type ? y.percent - x.percent : x.type === 'expense' ? -1 : 1))
+}
+
 // Suma de los % de asignación (debe ser 100).
 export function totalAllocationPercent(
   allocations: { percent: number }[],
