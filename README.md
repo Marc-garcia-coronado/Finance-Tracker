@@ -30,6 +30,8 @@ Requisitos: Node 18+ y un proyecto de Supabase.
 2. **Aplica el esquema** en Supabase: abre el **SQL Editor**, pega el contenido
    de [`schema.sql`](./schema.sql) y ejecútalo. Crea tablas, vistas, RPC, RLS y
    grants. Es idempotente (`if not exists` / `create or replace`).
+   Después aplica, **en orden**, los ficheros de [`migrations/`](./migrations)
+   (`001_e2ee.sql`, `002_replace_entry.sql`, …). Haz un backup antes de cada una.
 
 3. **Configura las variables de entorno**: copia `.env.example` a `.env.local` y
    rellena con los valores de **Supabase → Project Settings → API**:

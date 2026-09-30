@@ -3,6 +3,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { Button, Card, Input, Select } from '@/components/ui'
 import { SearchIcon } from '@/components/icons'
 import { matchesSearch } from '@/lib/search'
+import { isEditableKind } from '@/lib/entryForm'
 import { Modal } from '@/components/Modal'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
@@ -57,6 +58,7 @@ function useDebounced<T>(value: T, ms: number): T {
 
 export function MovimientosPage() {
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<EntryWithLines | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [month, setMonth] = useState<string>(MONTHS[0]!)
   const [kind, setKind] = useState<EntryFilters['kind']>('all')
@@ -230,7 +232,14 @@ export function MovimientosPage() {
         <>
           <Card className="divide-y divide-slate-100">
             {rows.map((e) => (
-              <Row key={e.id} entry={e} byId={byId} onVoid={onVoid} busy={voidEntry.isPending} />
+              <Row
+                key={e.id}
+                entry={e}
+                byId={byId}
+                onVoid={onVoid}
+                onEdit={setEditing}
+                busy={voidEntry.isPending}
+              />
             ))}
           </Card>
 
@@ -263,6 +272,10 @@ export function MovimientosPage() {
         <MovementForm onDone={() => setOpen(false)} />
       </Modal>
 
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title="Editar movimiento">
+        {editing && <MovementForm key={editing.id} entry={editing} onDone={() => setEditing(null)} />}
+      </Modal>
+
       <ImportMovementsModal open={importOpen} onClose={() => setImportOpen(false)} />
     </div>
   )
@@ -272,11 +285,13 @@ function Row({
   entry,
   byId,
   onVoid,
+  onEdit,
   busy,
 }: {
   entry: EntryWithLines
   byId: Map<string, string>
   onVoid: (id: string) => void
+  onEdit: (entry: EntryWithLines) => void
   busy: boolean
 }) {
   const pos = entry.entry_lines.find((l) => l.amount_cents > 0)
@@ -310,13 +325,25 @@ function Row({
       />
 
       {!isAnnulled && !isAnnulment && (
-        <button
-          onClick={() => onVoid(entry.id)}
-          disabled={busy}
-          className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
-        >
-          Anular
-        </button>
+        <div className="flex shrink-0 gap-1">
+          {/* Los ajustes de saldo se corrigen desde Patrimonio. */}
+          {isEditableKind(entry.kind) && (
+            <button
+              onClick={() => onEdit(entry)}
+              disabled={busy}
+              className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+            >
+              Editar
+            </button>
+          )}
+          <button
+            onClick={() => onVoid(entry.id)}
+            disabled={busy}
+            className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+          >
+            Anular
+          </button>
+        </div>
       )}
     </div>
   )
