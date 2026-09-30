@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { detectDelimiter, parseCsv } from './csv'
+import { detectDelimiter, parseCsv, toCsv } from './csv'
 
 describe('detectDelimiter', () => {
   it('detecta ; (Excel español)', () => {
@@ -39,5 +39,27 @@ describe('parseCsv', () => {
     const { headers, rows } = parseCsv('﻿a;b\r\n1;2\r\n\r\n')
     expect(headers).toEqual(['a', 'b'])
     expect(rows).toEqual([['1', '2']])
+  })
+})
+
+describe('toCsv', () => {
+  it('usa ; y añade el BOM', () => {
+    expect(toCsv(['A', 'B'], [['1', '2']])).toBe('﻿A;B\r\n1;2\r\n')
+  })
+  it('entrecomilla campos con ;, comillas o saltos de línea', () => {
+    const out = toCsv(['x'], [['a;b'], ['di "hola"'], ['línea 1\nlínea 2']])
+    expect(out).toContain('"a;b"')
+    expect(out).toContain('"di ""hola"""')
+    expect(out).toContain('"línea 1\nlínea 2"')
+  })
+  it('ida y vuelta con parseCsv', () => {
+    const rows = [
+      ['01/02/2026', 'Gasto', 'Cena; con amigos', '12,50'],
+      ['02/02/2026', 'Ingreso', 'Dijo "gracias"', '1800,00'],
+    ]
+    expect(parseCsv(toCsv(['Fecha', 'Tipo', 'Concepto', 'Importe'], rows))).toEqual({
+      headers: ['Fecha', 'Tipo', 'Concepto', 'Importe'],
+      rows,
+    })
   })
 })
