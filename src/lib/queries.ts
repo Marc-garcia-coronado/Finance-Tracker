@@ -267,76 +267,110 @@ export function useNetWorthHistory(): UseQueryResult<NetWorthPoint[]> {
   return useQuery({ ...ledgerQuery, select: netWorthFromLedger })
 }
 
-export type EntryFilters = {
+// Filtros que aplica el servidor (el texto de búsqueda se filtra en cliente).
+export type EntryQueryFilters = {
   month: string | 'all'
   kind: Enums<'entry_kind'> | 'all'
+  accountId: string | 'all'
+  hideVoided: boolean
+}
+
+export type EntryFilters = EntryQueryFilters & {
   page: number
   pageSize: number
 }
 
 export type EntriesPage = { rows: EntryWithLines[]; count: number }
 
-export function useEntries(filters: EntryFilters): UseQueryResult<EntriesPage> {
+type RawEntry = {
+  id: string
+  occurred_on: string
+  description: string
+  kind: Enums<'entry_kind'>
+  voided_at: string | null
+  voids_entry_id: string | null
+  created_at: string
+  entry_lines: { account_id: string; amount_cents: number | null; amount_enc: string | null }[]
+}
+
+const ENTRY_COLUMNS =
+  'id, occurred_on, description, kind, voided_at, voids_entry_id, created_at, entry_lines(account_id, amount_cents, amount_enc)'
+
+// Consulta de movimientos con los filtros del servidor, ordenada de más reciente
+// a más antiguo. El filtro por cuenta usa un 2º embed con alias (!inner) para
+// que `entry_lines` siga trayendo las DOS líneas del movimiento.
+function entriesQuery(filters: EntryQueryFilters, count?: 'exact') {
+  const columns =
+    filters.accountId !== 'all' ? `${ENTRY_COLUMNS}, filter_lines:entry_lines!inner(account_id)` : ENTRY_COLUMNS
+  let q = supabase.from('entries').select(columns, count ? { count } : undefined)
+
+  if (filters.month !== 'all') {
+    const { start, endExclusive } = monthRange(filters.month)
+    q = q.gte('occurred_on', start).lt('occurred_on', endExclusive)
+  }
+  if (filters.kind !== 'all') q = q.eq('kind', filters.kind)
+  if (filters.accountId !== 'all') q = q.eq('filter_lines.account_id', filters.accountId)
+  // Oculta el par completo: el anulado y su anulación.
+  if (filters.hideVoided) q = q.is('voided_at', null).is('voids_entry_id', null)
+
+  return q
+    .order('occurred_on', { ascending: false })
+    .order('created_at', { ascending: false })
+    .order('id')
+}
+
+async function decryptEntryRow(key: CryptoKey, e: unknown): Promise<EntryWithLines> {
+  const raw = e as RawEntry
+  return {
+    id: raw.id,
+    occurred_on: raw.occurred_on,
+    description: await decryptString(key, raw.description),
+    kind: raw.kind,
+    voided_at: raw.voided_at,
+    voids_entry_id: raw.voids_entry_id,
+    created_at: raw.created_at,
+    entry_lines: await Promise.all(
+      (raw.entry_lines ?? []).map(async (l) => ({
+        account_id: l.account_id,
+        amount_cents: l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0),
+      })),
+    ),
+  }
+}
+
+// Una página de movimientos (sin búsqueda de texto): paginación en servidor.
+export function useEntries(filters: EntryFilters, enabled = true): UseQueryResult<EntriesPage> {
   return useQuery({
     queryKey: qk.entries(filters),
+    enabled,
     queryFn: async () => {
-      let q = supabase
-        .from('entries')
-        .select(
-          'id, occurred_on, description, kind, voided_at, voids_entry_id, created_at, entry_lines(account_id, amount_cents, amount_enc)',
-          { count: 'exact' },
-        )
-
-      if (filters.month !== 'all') {
-        const { start, endExclusive } = monthRange(filters.month)
-        q = q.gte('occurred_on', start).lt('occurred_on', endExclusive)
-      }
-      if (filters.kind !== 'all') {
-        q = q.eq('kind', filters.kind)
-      }
-
       const from = filters.page * filters.pageSize
-      const to = from + filters.pageSize - 1
-      q = q
-        .order('occurred_on', { ascending: false })
-        .order('created_at', { ascending: false })
-        .range(from, to)
-
-      const { data, error, count } = await q
+      const { data, error, count } = await entriesQuery(filters, 'exact').range(
+        from,
+        from + filters.pageSize - 1,
+      )
       if (error) throw new Error(error.message)
 
       const key = requireSessionKey()
-      const rows: EntryWithLines[] = await Promise.all(
-        (data ?? []).map(async (e) => {
-          const raw = e as unknown as {
-            id: string
-            occurred_on: string
-            description: string
-            kind: Enums<'entry_kind'>
-            voided_at: string | null
-            voids_entry_id: string | null
-            created_at: string
-            entry_lines: { account_id: string; amount_cents: number | null; amount_enc: string | null }[]
-          }
-          return {
-            id: raw.id,
-            occurred_on: raw.occurred_on,
-            description: await decryptString(key, raw.description),
-            kind: raw.kind,
-            voided_at: raw.voided_at,
-            voids_entry_id: raw.voids_entry_id,
-            created_at: raw.created_at,
-            entry_lines: await Promise.all(
-              (raw.entry_lines ?? []).map(async (l) => ({
-                account_id: l.account_id,
-                amount_cents:
-                  l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0),
-              })),
-            ),
-          }
-        }),
-      )
+      const rows = await Promise.all((data ?? []).map((e) => decryptEntryRow(key, e)))
       return { rows, count: count ?? 0 }
+    },
+  })
+}
+
+// TODOS los movimientos que cumplen los filtros del servidor, descifrados, para
+// buscar por texto en cliente. La clave no incluye el texto: escribir no recarga.
+export function useEntriesForSearch(
+  filters: EntryQueryFilters,
+  enabled: boolean,
+): UseQueryResult<EntryWithLines[]> {
+  return useQuery({
+    queryKey: ['entries', 'search', filters],
+    enabled,
+    queryFn: async () => {
+      const data = await fetchAll((from, to) => entriesQuery(filters).range(from, to))
+      const key = requireSessionKey()
+      return Promise.all(data.map((e) => decryptEntryRow(key, e)))
     },
   })
 }
