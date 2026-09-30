@@ -5,6 +5,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query'
 import { supabase } from './supabase'
+import { fetchAll } from './fetchAll'
 import { adjustAccountBalance, createEntry, voidEntry, type CreateEntryParams } from './entries'
 import { generateRecurringForMonth } from './recurring'
 import { monthRange, todayISO } from './dates'
@@ -117,16 +118,26 @@ async function loadAccountsDecrypted(
 }
 
 async function loadLedgerLines(key: CryptoKey): Promise<DecryptedLine[]> {
-  const [eRes, lRes] = await Promise.all([
-    supabase.from('entries').select('id, occurred_on, kind, voided_at, voids_entry_id'),
-    supabase.from('entry_lines').select('entry_id, account_id, amount_enc, amount_cents'),
+  const [entries, lines] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from('entries')
+        .select('id, occurred_on, kind, voided_at, voids_entry_id')
+        .order('id')
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from('entry_lines')
+        .select('entry_id, account_id, amount_enc, amount_cents')
+        .order('id')
+        .range(from, to),
+    ),
   ])
-  if (eRes.error) throw new Error(eRes.error.message)
-  if (lRes.error) throw new Error(lRes.error.message)
 
-  const meta = new Map((eRes.data ?? []).map((e) => [e.id, e]))
+  const meta = new Map(entries.map((e) => [e.id, e]))
   const out: DecryptedLine[] = []
-  for (const l of lRes.data ?? []) {
+  for (const l of lines) {
     const e = meta.get(l.entry_id)
     // Excluye el par completo de una anulación: el movimiento original (marcado
     // con voided_at) Y su asiento inverso (marcado con voids_entry_id). Contar

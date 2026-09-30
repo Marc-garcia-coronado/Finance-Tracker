@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { fetchAll } from './fetchAll'
 import { monthRange } from './dates'
 import { requireSessionKey } from './crypto/session'
 import { decryptCents, encryptCents } from './crypto/webcrypto'
@@ -33,15 +34,18 @@ export async function generateRecurringForMonth(
     .eq('is_active', true)
   if (tErr) throw new Error(tErr.message)
 
-  const { data: existing, error: eErr } = await supabase
-    .from('entries')
-    .select('occurred_on, kind, voided_at, entry_lines(account_id, amount_cents, amount_enc)')
-    .gte('occurred_on', start)
-    .lt('occurred_on', endExclusive)
-  if (eErr) throw new Error(eErr.message)
+  const existing = await fetchAll((from, to) =>
+    supabase
+      .from('entries')
+      .select('occurred_on, kind, voided_at, entry_lines(account_id, amount_cents, amount_enc)')
+      .gte('occurred_on', start)
+      .lt('occurred_on', endExclusive)
+      .order('id')
+      .range(from, to),
+  )
 
   const existingSigs = new Set<string>()
-  for (const e of (existing ?? []) as unknown as {
+  for (const e of existing as unknown as {
     occurred_on: string
     kind: string
     voided_at: string | null
