@@ -21,6 +21,7 @@ import {
   type Ledger,
   type LedgerLine,
 } from './ledger'
+import { checkIntegrity, type IntegrityEntry, type IntegrityLine, type IntegrityProblem } from './integrity'
 
 // ---------------------------------------------------------------------------
 // Tipos de filas (versión DESCIFRADA: lo que ven los componentes).
@@ -443,6 +444,72 @@ export function useAdjustBalance() {
       qc.invalidateQueries({ queryKey: qk.accounts })
     },
   })
+}
+
+// ---------------------------------------------------------------------------
+// Verificación de integridad (bajo demanda, desde Config)
+// ---------------------------------------------------------------------------
+export type IntegrityResult = { checkedEntries: number; problems: IntegrityProblem[] }
+
+// A diferencia de decryptCents, NO devuelve 0 si falla: null para poder reportarlo.
+async function decryptLineStrict(key: CryptoKey, enc: string | null, plain: number | null): Promise<number | null> {
+  if (enc == null) return plain
+  try {
+    const n = Number(await decryptString(key, enc))
+    return Number.isInteger(n) ? n : null
+  } catch {
+    return null
+  }
+}
+
+async function runIntegrityCheck(key: CryptoKey): Promise<IntegrityResult> {
+  const [entries, lines] = await Promise.all([
+    fetchAll((from, to) =>
+      supabase
+        .from('entries')
+        .select('id, occurred_on, description, voided_at, voids_entry_id')
+        .order('id')
+        .range(from, to),
+    ),
+    fetchAll((from, to) =>
+      supabase
+        .from('entry_lines')
+        .select('entry_id, account_id, amount_enc, amount_cents')
+        .order('id')
+        .range(from, to),
+    ),
+  ])
+
+  const linesByEntry = new Map<string, IntegrityLine[]>()
+  await Promise.all(
+    lines.map(async (l) => {
+      const decoded: IntegrityLine = {
+        account_id: l.account_id,
+        cents: await decryptLineStrict(key, l.amount_enc, l.amount_cents),
+        encrypted: l.amount_enc != null,
+      }
+      const list = linesByEntry.get(l.entry_id)
+      if (list) list.push(decoded)
+      else linesByEntry.set(l.entry_id, [decoded])
+    }),
+  )
+
+  const items: IntegrityEntry[] = await Promise.all(
+    entries.map(async (e) => ({
+      id: e.id,
+      occurred_on: e.occurred_on,
+      description: await decryptString(key, e.description).catch(() => '(no se pudo descifrar)'),
+      voided_at: e.voided_at,
+      voids_entry_id: e.voids_entry_id,
+      lines: linesByEntry.get(e.id) ?? [],
+    })),
+  )
+
+  return { checkedEntries: items.length, problems: checkIntegrity(items) }
+}
+
+export function useCheckIntegrity() {
+  return useMutation({ mutationFn: () => runIntegrityCheck(requireSessionKey()) })
 }
 
 export function useGenerateRecurring() {

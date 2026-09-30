@@ -5,10 +5,12 @@ import { Modal } from '@/components/Modal'
 import { ErrorState, LoadingState } from '@/components/states'
 import { cn } from '@/lib/cn'
 import { formatEuro, tryEuroToCents } from '@/lib/money'
+import { formatDate } from '@/lib/dates'
 import {
   useAccounts,
   useAllocations,
   useArchiveAccount,
+  useCheckIntegrity,
   useSaveAccount,
   useSaveAllocations,
   useSettings,
@@ -40,8 +42,58 @@ export function ConfigPage() {
         incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
       />
       <AccountsCard accounts={accounts.data ?? []} />
+      <IntegrityCard />
       <HelpCard />
     </div>
+  )
+}
+
+// --- Integridad de los datos ---------------------------------------------------
+function IntegrityCard() {
+  const check = useCheckIntegrity()
+  const result = check.data
+
+  return (
+    <Card className="p-4">
+      <h2 className="mb-1 font-semibold text-slate-900">Integridad de los datos</h2>
+      <p className="mb-3 text-sm text-slate-500">
+        Comprueba que todos los movimientos cuadran y están cifrados.
+      </p>
+      <Button variant="secondary" onClick={() => check.mutate()} loading={check.isPending}>
+        Verificar
+      </Button>
+
+      {check.isError && (
+        <p className="mt-3 text-sm text-rose-700" role="alert">
+          No se pudo verificar: {check.error.message}
+        </p>
+      )}
+
+      {result && result.problems.length === 0 && (
+        <p className="mt-3 text-sm text-emerald-700" role="status">
+          ✓ {result.checkedEntries} movimientos revisados, sin problemas.
+        </p>
+      )}
+
+      {result && result.problems.length > 0 && (
+        <div className="mt-3" role="status">
+          <p className="mb-2 text-sm font-medium text-rose-700">
+            {result.problems.length === 1 ? '1 problema' : `${result.problems.length} problemas`} en{' '}
+            {result.checkedEntries} movimientos revisados
+          </p>
+          <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+            {result.problems.map((p) => (
+              <li key={`${p.entryId}-${p.kind}`} className="px-3 py-2 text-sm">
+                <p className="text-slate-800">
+                  {formatDate(p.occurred_on)} · {p.description || 'Sin descripción'}
+                </p>
+                <p className="text-xs text-slate-500">{p.message}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Card>
   )
 }
 
