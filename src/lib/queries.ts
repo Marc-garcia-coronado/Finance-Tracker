@@ -6,7 +6,13 @@ import {
 } from '@tanstack/react-query'
 import { supabase } from './supabase'
 import { fetchAll } from './fetchAll'
-import { adjustAccountBalance, createEntry, voidEntry, type CreateEntryParams } from './entries'
+import {
+  adjustAccountBalance,
+  createEntry,
+  replaceEntry,
+  voidEntry,
+  type CreateEntryParams,
+} from './entries'
 import { generateRecurringForMonth } from './recurring'
 import { monthRange, todayISO } from './dates'
 import { requireSessionKey } from './crypto/session'
@@ -390,6 +396,14 @@ export function useVoidEntry() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => voidEntry(id),
+    onSuccess: () => invalidateLedger(qc),
+  })
+}
+
+export function useReplaceEntry() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, params }: { id: string; params: CreateEntryParams }) => replaceEntry(id, params),
     onSuccess: () => invalidateLedger(qc),
   })
 }

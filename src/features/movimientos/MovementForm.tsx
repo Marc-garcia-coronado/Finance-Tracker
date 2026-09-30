@@ -1,11 +1,12 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button, Field, Input, Select } from '@/components/ui'
 import { tryEuroToCents } from '@/lib/money'
 import { todayISO } from '@/lib/dates'
-import { useAccounts, useCreateEntry } from '@/lib/queries'
+import { entryToFormValues, type MovementFormValues } from '@/lib/entryForm'
+import { useAccounts, useCreateEntry, useReplaceEntry, type EntryWithLines } from '@/lib/queries'
 import type { EntryKind } from '@/lib/entries'
 
 const schema = z
@@ -36,9 +37,20 @@ const KIND_LABEL: Record<EntryKind, { from: string; to: string; verb: string }> 
   transfer: { from: 'Desde', to: 'Hacia', verb: 'Traspaso' },
 }
 
-export function MovementForm({ onDone }: { onDone: () => void }) {
+// Con `entry`, modo edición: el formulario se rellena con el movimiento y al
+// guardar se anula el original y se crea el corregido (replace_entry, atómico).
+export function MovementForm({ onDone, entry }: { onDone: () => void; entry?: EntryWithLines }) {
   const accounts = useAccounts()
   const createEntry = useCreateEntry()
+  const replaceEntry = useReplaceEntry()
+
+  const initial: MovementFormValues = useMemo(
+    () =>
+      entry
+        ? entryToFormValues(entry)
+        : { kind: 'expense', date: todayISO(), description: '', amount: '', fromAccountId: '', toAccountId: '' },
+    [entry],
+  )
 
   const {
     register,
@@ -46,19 +58,21 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
     watch,
     setValue,
     setError,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { kind: 'expense', date: todayISO(), description: '', amount: '' },
+    defaultValues: initial,
   })
 
   const kind = watch('kind') as EntryKind
-  const active = (accounts.data ?? []).filter((a) => !a.is_archived)
+  // En edición se muestran también las cuentas archivadas que ya usa el movimiento.
+  const keep = new Set([initial.fromAccountId, initial.toAccountId])
+  const selectable = (accounts.data ?? []).filter((a) => !a.is_archived || keep.has(a.id))
 
   const { fromOptions, toOptions } = useMemo(() => {
-    const assets = active.filter((a) => a.type === 'asset')
-    const incomes = active.filter((a) => a.type === 'income')
-    const expenses = active.filter((a) => a.type === 'expense')
+    const assets = selectable.filter((a) => a.type === 'asset')
+    const incomes = selectable.filter((a) => a.type === 'income')
+    const expenses = selectable.filter((a) => a.type === 'expense')
     if (kind === 'expense') return { fromOptions: assets, toOptions: expenses }
     if (kind === 'income') return { fromOptions: incomes, toOptions: assets }
     return { fromOptions: assets, toOptions: assets }
@@ -66,7 +80,12 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
   }, [kind, accounts.data])
 
   // Al cambiar el tipo, limpia las cuentas para no dejar combinaciones inválidas.
+  // Solo si el tipo cambia de verdad (no al montar, ni en el doble efecto de
+  // StrictMode): en edición borraría las cuentas precargadas.
+  const prevKind = useRef(kind)
   useEffect(() => {
+    if (prevKind.current === kind) return
+    prevKind.current = kind
     setValue('fromAccountId', '')
     setValue('toAccountId', '')
   }, [kind, setValue])
@@ -77,15 +96,21 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
       setError('amount', { message: 'Importe no válido' })
       return
     }
+    if (entry && !isDirty) {
+      onDone() // sin cambios: no se anula ni se recrea nada
+      return
+    }
+    const params = {
+      kind: values.kind,
+      date: values.date,
+      description: values.description?.trim() ?? '',
+      fromAccountId: values.fromAccountId,
+      toAccountId: values.toAccountId,
+      amountCents,
+    }
     try {
-      await createEntry.mutateAsync({
-        kind: values.kind,
-        date: values.date,
-        description: values.description?.trim() ?? '',
-        fromAccountId: values.fromAccountId,
-        toAccountId: values.toAccountId,
-        amountCents,
-      })
+      if (entry) await replaceEntry.mutateAsync({ id: entry.id, params })
+      else await createEntry.mutateAsync(params)
       onDone()
     } catch (e) {
       setError('root', {
@@ -95,9 +120,17 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
   }
 
   const labels = KIND_LABEL[kind]
+  const label = (a: { name: string; is_archived: boolean }) => a.name + (a.is_archived ? ' (archivada)' : '')
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      {entry && (
+        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          Al guardar, el movimiento original se anula y se crea uno nuevo con los cambios. El
+          original queda en el historial como «Anulado».
+        </p>
+      )}
+
       <Field label="Tipo" htmlFor="kind">
         <Select id="kind" {...register('kind')}>
           <option value="expense">Gasto</option>
@@ -130,7 +163,7 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
           <option value="">Selecciona…</option>
           {fromOptions.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.name}
+              {label(a)}
             </option>
           ))}
         </Select>
@@ -141,7 +174,7 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
           <option value="">Selecciona…</option>
           {toOptions.map((a) => (
             <option key={a.id} value={a.id}>
-              {a.name}
+              {label(a)}
             </option>
           ))}
         </Select>
@@ -158,7 +191,7 @@ export function MovementForm({ onDone }: { onDone: () => void }) {
           Cancelar
         </Button>
         <Button type="submit" loading={isSubmitting}>
-          Guardar {labels.verb.toLowerCase()}
+          {entry ? 'Guardar cambios' : `Guardar ${labels.verb.toLowerCase()}`}
         </Button>
       </div>
     </form>

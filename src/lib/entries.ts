@@ -19,9 +19,10 @@ export type CreateEntryParams = {
   amountCents: number // SIEMPRE > 0
 }
 
-// Construye las dos líneas (suman 0) con importes CIFRADOS y llama a create_entry.
+// Valida y construye los argumentos de un movimiento: las dos líneas (suman 0)
+// con importes CIFRADOS y la descripción cifrada.
 // Convención uniforme: origen -importe, destino +importe.
-export async function createEntry(params: CreateEntryParams): Promise<string> {
+async function buildEntryArgs(key: CryptoKey, params: CreateEntryParams) {
   const { kind, date, description, fromAccountId, toAccountId, amountCents } = params
 
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
@@ -31,17 +32,34 @@ export async function createEntry(params: CreateEntryParams): Promise<string> {
     throw new Error('Las dos cuentas deben ser distintas')
   }
 
-  const key = requireSessionKey()
   const lines: Json = [
     { account_id: fromAccountId, amount_enc: await encryptCents(key, -amountCents) },
     { account_id: toAccountId, amount_enc: await encryptCents(key, amountCents) },
   ]
-
-  const { data, error } = await supabase.rpc('create_entry', {
+  return {
     p_occurred_on: date,
     p_description: await encryptString(key, description),
     p_kind: kind,
     p_lines: lines,
+  }
+}
+
+export async function createEntry(params: CreateEntryParams): Promise<string> {
+  const key = requireSessionKey()
+  const { data, error } = await supabase.rpc('create_entry', await buildEntryArgs(key, params))
+  if (error) throw new Error(error.message)
+  return data
+}
+
+// Edita un movimiento: anula el original y crea el corregido en UNA transacción
+// (RPC replace_entry, migrations/002_replace_entry.sql). Si falla, no cambia nada.
+export async function replaceEntry(entryId: string, params: CreateEntryParams): Promise<string> {
+  const key = requireSessionKey()
+  const [voidLines, args] = await Promise.all([buildVoidLines(key, entryId), buildEntryArgs(key, params)])
+  const { data, error } = await supabase.rpc('replace_entry', {
+    p_entry_id: entryId,
+    p_void_lines: voidLines,
+    ...args,
   })
   if (error) throw new Error(error.message)
   return data
@@ -87,7 +105,16 @@ export async function adjustAccountBalance(params: {
 // crea el inverso (con voids_entry_id) y marca el original anulado de forma atómica.
 export async function voidEntry(entryId: string): Promise<string> {
   const key = requireSessionKey()
+  const { data, error } = await supabase.rpc('void_entry', {
+    p_entry_id: entryId,
+    p_lines: await buildVoidLines(key, entryId),
+  })
+  if (error) throw new Error(error.message)
+  return data
+}
 
+// Líneas del movimiento inverso: lee las del original, las niega y las recifra.
+async function buildVoidLines(key: CryptoKey, entryId: string): Promise<Json> {
   const { data: rows, error } = await supabase
     .from('entry_lines')
     .select('account_id, amount_enc, amount_cents')
@@ -95,17 +122,10 @@ export async function voidEntry(entryId: string): Promise<string> {
   if (error) throw new Error(error.message)
   if (!rows || rows.length === 0) throw new Error('El movimiento no tiene líneas')
 
-  const lines: Json = await Promise.all(
+  return Promise.all(
     rows.map(async (l) => {
       const cents = l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0)
       return { account_id: l.account_id, amount_enc: await encryptCents(key, -cents) }
     }),
   )
-
-  const { data, error: voidError } = await supabase.rpc('void_entry', {
-    p_entry_id: entryId,
-    p_lines: lines,
-  })
-  if (voidError) throw new Error(voidError.message)
-  return data
 }

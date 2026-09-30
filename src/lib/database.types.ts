@@ -337,6 +337,17 @@ export type Database = {
         Args: { p_entry_id: string; p_lines: Json }
         Returns: string
       }
+      replace_entry: {
+        Args: {
+          p_entry_id: string
+          p_void_lines: Json
+          p_occurred_on: string
+          p_description: string
+          p_kind: Database['public']['Enums']['entry_kind']
+          p_lines: Json
+        }
+        Returns: string
+      }
       seed_default_accounts: {
         Args: Record<PropertyKey, never>
         Returns: undefined
