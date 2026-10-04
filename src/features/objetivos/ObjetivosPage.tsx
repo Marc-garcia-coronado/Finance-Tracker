@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
 import { Button, Card, Field, Input, Select } from '@/components/ui'
 import { Modal } from '@/components/Modal'
+import { useConfirm } from '@/components/confirmContext'
 import { Money } from '@/components/Money'
 import { ProgressBar } from '@/components/ProgressBar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
@@ -26,6 +27,7 @@ export function ObjetivosPage() {
   const balances = useBalances()
   const accounts = useAccounts()
   const del = useDeleteGoal()
+  const confirmDialog = useConfirm()
   const [editing, setEditing] = useState<Goal | null>(null)
   const [open, setOpen] = useState(false)
 
@@ -46,7 +48,13 @@ export function ObjetivosPage() {
     setOpen(true)
   }
   async function onDelete(g: Goal) {
-    if (!confirm(`¿Eliminar el objetivo "${g.name}"?`)) return
+    const ok = await confirmDialog({
+      title: 'Eliminar objetivo',
+      message: `¿Eliminar el objetivo "${g.name}"?`,
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    })
+    if (!ok) return
     await del.mutateAsync(g.id)
   }
 

@@ -8,6 +8,7 @@ import { VaultGate } from '@/features/crypto/VaultGate'
 import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { AppLayout } from '@/components/AppLayout'
 import { LoadingState } from '@/components/states'
+import { ConfirmProvider } from '@/components/ConfirmDialog'
 
 // Code-splitting por ruta: el bundle de cada página (y recharts en el
 // Dashboard) se carga bajo demanda.
@@ -42,25 +43,27 @@ export default function App() {
       <AuthProvider>
         <CryptoProvider>
           <BrowserRouter>
-            <Suspense fallback={<LoadingState />}>
-              <Routes>
-                <Route path="/login" element={<LoginPage />} />
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<VaultGate />}>
-                    <Route element={<AppLayout />}>
-                      <Route index element={<DashboardPage />} />
-                      <Route path="movimientos" element={<MovimientosPage />} />
-                      <Route path="mensual" element={<MensualPage />} />
-                      <Route path="recurrentes" element={<RecurrentesPage />} />
-                      <Route path="objetivos" element={<ObjetivosPage />} />
-                      <Route path="patrimonio" element={<PatrimonioPage />} />
-                      <Route path="config" element={<ConfigPage />} />
+            <ConfirmProvider>
+              <Suspense fallback={<LoadingState />}>
+                <Routes>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route element={<ProtectedRoute />}>
+                    <Route element={<VaultGate />}>
+                      <Route element={<AppLayout />}>
+                        <Route index element={<DashboardPage />} />
+                        <Route path="movimientos" element={<MovimientosPage />} />
+                        <Route path="mensual" element={<MensualPage />} />
+                        <Route path="recurrentes" element={<RecurrentesPage />} />
+                        <Route path="objetivos" element={<ObjetivosPage />} />
+                        <Route path="patrimonio" element={<PatrimonioPage />} />
+                        <Route path="config" element={<ConfigPage />} />
+                      </Route>
                     </Route>
                   </Route>
-                </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Suspense>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </Suspense>
+            </ConfirmProvider>
           </BrowserRouter>
         </CryptoProvider>
       </AuthProvider>

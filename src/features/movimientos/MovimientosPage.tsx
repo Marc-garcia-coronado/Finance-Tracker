@@ -7,6 +7,7 @@ import { isEditableKind } from '@/lib/entryForm'
 import { entriesToCsv } from '@/lib/exportMovements'
 import { saveFile } from '@/lib/saveFile'
 import { Modal } from '@/components/Modal'
+import { useConfirm } from '@/components/confirmContext'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { cn } from '@/lib/cn'
@@ -82,6 +83,7 @@ export function MovimientosPage() {
   const paged = useEntries({ ...serverFilters, page, pageSize: PAGE_SIZE }, !searching)
   const all = useEntriesForSearch(serverFilters, searching)
   const voidEntry = useVoidEntry()
+  const confirmDialog = useConfirm()
 
   // Con búsqueda: filtrado y paginación en cliente sobre todos los movimientos.
   const matches = useMemo(
@@ -118,7 +120,13 @@ export function MovimientosPage() {
   }
 
   async function onVoid(id: string) {
-    if (!confirm('¿Anular este movimiento? Se creará su inverso (no se borra).')) return
+    const ok = await confirmDialog({
+      title: 'Anular movimiento',
+      message: '¿Anular este movimiento? Se creará su inverso (no se borra).',
+      confirmLabel: 'Anular',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await voidEntry.mutateAsync(id)
     } catch (e) {
