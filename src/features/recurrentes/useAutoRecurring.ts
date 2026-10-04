@@ -20,6 +20,9 @@ export function useAutoRecurring(): AutoRecurringState {
   const [state, setState] = useState<AutoRecurringState>({ status: 'idle' })
 
   useEffect(() => {
+    // Sin conexión no se puede escribir: se genera en la próxima apertura con red
+    // (no se marca como ejecutado), sin enseñar un error que ya explica el banner.
+    if (navigator.onLine === false) return
     let cancelled = false
     setState({ status: 'running' })
     run ??= generatePendingRecurring(todayISO())
