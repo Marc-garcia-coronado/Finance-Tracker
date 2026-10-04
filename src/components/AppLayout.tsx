@@ -1,7 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { useState, type ComponentType, type ReactNode, type SVGProps } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAutoRecurring } from '@/features/recurrentes/useAutoRecurring'
 import { supabase } from '@/lib/supabase'
+import { lastDataUpdate } from '@/lib/offlineCache'
+import { useOnline } from '@/lib/useOnline'
 import { cn } from '@/lib/cn'
 import { Modal } from './Modal'
 import { MovementForm } from '@/features/movimientos/MovementForm'
@@ -51,6 +55,23 @@ const DESKTOP_NAV: NavItem[] = [
   { to: '/config', label: 'Configuración', icon: SettingsIcon },
 ]
 
+// Aviso de modo sin conexión: se ve lo último cargado, en solo lectura.
+function OfflineNotice() {
+  const online = useOnline()
+  const qc = useQueryClient()
+  if (online) return null
+  const last = lastDataUpdate(qc)
+  return (
+    <div
+      role="status"
+      className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+    >
+      Sin conexión{last ? ` · datos de ${format(last, 'dd/MM/yyyy HH:mm')}` : ''}. Solo lectura:
+      no se pueden guardar cambios hasta que vuelva la red.
+    </div>
+  )
+}
+
 // Aviso de la generación automática de recurrentes al abrir la app.
 function AutoRecurringNotice() {
   const state = useAutoRecurring()
@@ -96,6 +117,7 @@ export function AppLayout() {
   const location = useLocation()
   const [moreOpen, setMoreOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
+  const online = useOnline()
 
   const moreActive = MORE.some((item) => location.pathname.startsWith(item.to))
 
@@ -146,6 +168,8 @@ export function AppLayout() {
           <span className="font-bold tracking-tight text-slate-900">Finanzas</span>
           <button
             onClick={() => setQuickOpen(true)}
+            disabled={!online}
+            title={online ? undefined : 'Sin conexión'}
             className="btn-primary ml-auto hidden md:inline-flex"
           >
             <PlusIcon className="h-4 w-4" />
@@ -184,6 +208,7 @@ export function AppLayout() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6">
+        <OfflineNotice />
         <AutoRecurringNotice />
         <Outlet />
       </main>
@@ -197,8 +222,9 @@ export function AppLayout() {
           {PRIMARY.slice(0, 2).map((item) => renderTab(item))}
           <button
             onClick={() => setQuickOpen(true)}
+            disabled={!online}
             aria-label="Añadir movimiento"
-            className="flex items-center justify-center"
+            className="flex items-center justify-center disabled:opacity-40"
           >
             <span className="-mt-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/40 transition active:scale-95">
               <PlusIcon className="h-6 w-6" strokeWidth={2.2} />
