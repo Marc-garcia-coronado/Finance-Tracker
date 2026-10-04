@@ -3,7 +3,11 @@ import { Modal } from '@/components/Modal'
 import { Button, Card, Field, Select } from '@/components/ui'
 import { ProgressBar } from '@/components/ProgressBar'
 import { Money } from '@/components/Money'
+import { addDays, format, parseISO } from 'date-fns'
 import { cn } from '@/lib/cn'
+import { requireSessionKey } from '@/lib/crypto/session'
+import { findExistingDuplicates } from '@/lib/entrySignature'
+import { loadExistingSignatures } from '@/lib/recurring'
 import { formatDate } from '@/lib/dates'
 import { parseCsv } from '@/lib/csv'
 import { saveFile } from '@/lib/saveFile'
@@ -56,6 +60,12 @@ export function ImportMovementsModal({
   const [rows, setRows] = useState<ParsedRow[]>([])
   const [mappingKeys, setMappingKeys] = useState<MappingKey[]>([])
   const [duplicates, setDuplicates] = useState<Set<number>>(new Set())
+  // Filas que ya existen en los movimientos (rawIndex) y las que el usuario
+  // decide importar igualmente. Por defecto, ninguna se importa.
+  const [existing, setExisting] = useState<Set<number>>(new Set())
+  const [forced, setForced] = useState<Set<number>>(new Set())
+  const [checking, setChecking] = useState(false)
+  const [checkError, setCheckError] = useState<string | null>(null)
   const [mapping, setMapping] = useState<Record<string, Mapping>>({})
   const [principalId, setPrincipalId] = useState('')
   const [progress, setProgress] = useState(0)
@@ -78,6 +88,10 @@ export function ImportMovementsModal({
     setRows([])
     setMappingKeys([])
     setDuplicates(new Set())
+    setExisting(new Set())
+    setForced(new Set())
+    setChecking(false)
+    setCheckError(null)
     setMapping({})
     setProgress(0)
     setResult(null)
@@ -141,7 +155,12 @@ export function ImportMovementsModal({
       return !!m && !!m.kind && (m.accountId === NEW || !!m.accountId)
     })
 
-  const validRows = rows.filter((r) => !r.error && !duplicates.has(r.rawIndex))
+  // Filas sin error ni duplicadas dentro del archivo.
+  const candidateRows = rows.filter((r) => !r.error && !duplicates.has(r.rawIndex))
+  const existingRows = candidateRows.filter((r) => existing.has(r.rawIndex))
+  const validRows = candidateRows.filter(
+    (r) => !existing.has(r.rawIndex) || forced.has(r.rawIndex),
+  )
   const errorCount = rows.filter((r) => r.error).length
 
   function updateMapping(key: string, patch: Partial<Mapping>) {
@@ -155,15 +174,26 @@ export function ImportMovementsModal({
     })
   }
 
-  // Resuelve las filas válidas a CreateEntryParams usando el mapeo + cuentas
-  // nuevas ya creadas (newIds: key -> accountId).
-  function resolveEntries(newIds: Record<string, string>): {
-    entries: CreateEntryParams[]
+  // accounts.name es UNIQUE (user_id, name): una categoría marcada «Crear» que ya
+  // existe por nombre (de cualquier tipo, incluso archivada) se reutiliza.
+  const accountIdByName = useMemo(
+    () => new Map((accounts.data ?? []).map((a) => [normalizeText(a.name), a.id])),
+    [accounts.data],
+  )
+
+  // Resuelve las filas dadas a CreateEntryParams usando el mapeo + cuentas
+  // nuevas ya creadas (newIds: key -> accountId). Conserva el rawIndex de cada
+  // fila para poder marcarla.
+  function resolveEntries(
+    sourceRows: ParsedRow[],
+    newIds: Record<string, string>,
+  ): {
+    items: { rawIndex: number; params: CreateEntryParams }[]
     unresolved: number
   } {
-    const entries: CreateEntryParams[] = []
+    const items: { rawIndex: number; params: CreateEntryParams }[] = []
     let unresolved = 0
-    for (const r of validRows) {
+    for (const r of sourceRows) {
       const key = mappingKeyOf(r.kindGuess, r.categoria)
       const m = mapping[key]
       if (!m || !m.kind || r.dateISO === null || r.amountCents === null) {
@@ -179,16 +209,69 @@ export function ImportMovementsModal({
         continue
       }
       const isIncome = m.kind === 'income'
-      entries.push({
-        kind: m.kind,
-        date: r.dateISO,
-        description: r.concepto,
-        fromAccountId: isIncome ? categoryId : rowAccountId,
-        toAccountId: isIncome ? rowAccountId : categoryId,
-        amountCents: r.amountCents,
+      items.push({
+        rawIndex: r.rawIndex,
+        params: {
+          kind: m.kind,
+          date: r.dateISO,
+          description: r.concepto,
+          fromAccountId: isIncome ? categoryId : rowAccountId,
+          toAccountId: isIncome ? rowAccountId : categoryId,
+          amountCents: r.amountCents,
+        },
       })
     }
-    return { entries, unresolved }
+    return { items, unresolved }
+  }
+
+  // Paso mapear -> confirmar: busca qué filas ya existen como movimientos. Las
+  // categorías «Crear» que aún no existen no pueden ser duplicadas (se omiten).
+  async function onContinue() {
+    setCheckError(null)
+    setChecking(true)
+    try {
+      const previewIds: Record<string, string> = {}
+      for (const k of mappingKeys) {
+        if (mapping[k.key]?.accountId !== NEW) continue
+        const id = accountIdByName.get(normalizeText(k.categoria))
+        if (id) previewIds[k.key] = id
+      }
+      const { items } = resolveEntries(candidateRows, previewIds)
+      let found = new Set<number>()
+      if (items.length > 0) {
+        const dates = items.map((i) => i.params.date).sort()
+        const endExclusive = format(addDays(parseISO(dates[dates.length - 1]!), 1), 'yyyy-MM-dd')
+        const sigs = await loadExistingSignatures(
+          requireSessionKey(),
+          dates[0]!,
+          endExclusive,
+          false, // un movimiento anulado no cuenta: reimportarlo es legítimo
+        )
+        const dupIdx = findExistingDuplicates(
+          items.map((i) => i.params),
+          sigs,
+        )
+        found = new Set([...dupIdx].map((idx) => items[idx]!.rawIndex))
+      }
+      setExisting(found)
+      setForced(new Set())
+      setStep('confirm')
+    } catch (e) {
+      setCheckError(
+        'No se pudo comprobar si ya existen: ' + (e instanceof Error ? e.message : 'error'),
+      )
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  function toggleForced(rawIndex: number) {
+    setForced((prev) => {
+      const next = new Set(prev)
+      if (next.has(rawIndex)) next.delete(rawIndex)
+      else next.add(rawIndex)
+      return next
+    })
   }
 
   async function onImport() {
@@ -196,9 +279,7 @@ export function ImportMovementsModal({
     // accounts.name tiene una restricción UNIQUE (user_id, name): si ya existe
     // una cuenta con ese nombre (de cualquier tipo, incluso archivada) la
     // reutilizamos en vez de intentar crearla (evita el 409 Conflict).
-    const byName = new Map(
-      (accounts.data ?? []).map((a) => [normalizeText(a.name), a.id]),
-    )
+    const byName = new Map(accountIdByName)
     const newIds: Record<string, string> = {}
     try {
       for (const k of mappingKeys) {
@@ -227,7 +308,7 @@ export function ImportMovementsModal({
     }
 
     // 2) Resolver e importar.
-    const { entries } = resolveEntries(newIds)
+    const entries = resolveEntries(validRows, newIds).items.map((i) => i.params)
     setStep('result')
     setProgress(0)
     const res = await importMutation.mutateAsync({
@@ -266,15 +347,22 @@ export function ImportMovementsModal({
           duplicateCount={duplicates.size}
           hasAccountColumn={rows.some((r) => r.cuenta !== '')}
           canContinue={mappingComplete}
+          checking={checking}
+          checkError={checkError}
           onBack={() => setStep('upload')}
-          onContinue={() => setStep('confirm')}
+          onContinue={onContinue}
         />
       )}
 
       {step === 'confirm' && (
         <ConfirmStep
           rows={rows}
-          duplicates={duplicates}
+          candidateRows={candidateRows}
+          existingRows={existingRows}
+          forced={forced}
+          toggleForced={toggleForced}
+          setForced={setForced}
+          duplicateCount={duplicates.size}
           validCount={validRows.length}
           errorCount={errorCount}
           onBack={() => setStep('map')}
@@ -374,6 +462,8 @@ function MapStep({
   duplicateCount,
   hasAccountColumn,
   canContinue,
+  checking,
+  checkError,
   onBack,
   onContinue,
 }: {
@@ -389,6 +479,8 @@ function MapStep({
   duplicateCount: number
   hasAccountColumn: boolean
   canContinue: boolean
+  checking: boolean
+  checkError: string | null
   onBack: () => void
   onContinue: () => void
 }) {
@@ -465,12 +557,18 @@ function MapStep({
         })}
       </div>
 
+      {checkError && (
+        <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+          {checkError}
+        </p>
+      )}
+
       <div className="flex justify-between gap-2 pt-2">
-        <Button type="button" variant="secondary" onClick={onBack}>
+        <Button type="button" variant="secondary" onClick={onBack} disabled={checking}>
           Atrás
         </Button>
-        <Button type="button" disabled={!canContinue} onClick={onContinue}>
-          Continuar
+        <Button type="button" disabled={!canContinue} loading={checking} onClick={onContinue}>
+          {checkError ? 'Reintentar' : 'Continuar'}
         </Button>
       </div>
     </div>
@@ -482,7 +580,12 @@ function MapStep({
 // ---------------------------------------------------------------------------
 function ConfirmStep({
   rows,
-  duplicates,
+  candidateRows,
+  existingRows,
+  forced,
+  toggleForced,
+  setForced,
+  duplicateCount,
   validCount,
   errorCount,
   onBack,
@@ -490,45 +593,83 @@ function ConfirmStep({
   busy,
 }: {
   rows: ParsedRow[]
-  duplicates: Set<number>
+  candidateRows: ParsedRow[]
+  existingRows: ParsedRow[]
+  forced: Set<number>
+  toggleForced: (rawIndex: number) => void
+  setForced: (next: Set<number>) => void
+  duplicateCount: number
   validCount: number
   errorCount: number
   onBack: () => void
   onImport: () => void
   busy: boolean
 }) {
-  const preview = rows.filter((r) => !r.error && !duplicates.has(r.rawIndex)).slice(0, 8)
+  const existingIds = new Set(existingRows.map((r) => r.rawIndex))
+  const fresh = candidateRows.filter((r) => !existingIds.has(r.rawIndex))
+  const preview = fresh.slice(0, 8)
   const errors = rows.filter((r) => r.error).slice(0, 5)
+  const allForced = existingRows.length > 0 && forced.size === existingRows.length
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2 text-center">
+      <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
         <Summary label="A importar" value={validCount} tone="emerald" />
+        <Summary label="Ya existen" value={existingRows.length} tone="amber" />
+        <Summary label="Repetidas en el archivo" value={duplicateCount} tone="slate" />
         <Summary label="Con error" value={errorCount} tone="rose" />
-        <Summary label="Duplicadas" value={duplicates.size} tone="slate" />
       </div>
 
       {preview.length > 0 && (
         <Card className="divide-y divide-slate-100">
           {preview.map((r) => (
-            <div key={r.rawIndex} className="flex items-center gap-2 px-3 py-2 text-sm">
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-slate-800">
-                  {r.concepto || '(sin concepto)'}
-                </p>
-                <p className="truncate text-xs text-slate-500">
-                  {r.dateISO ? formatDate(r.dateISO) : '—'} · {r.tipoRaw} · {r.categoria}
-                </p>
-              </div>
-              <Money cents={r.amountCents ?? 0} className="shrink-0 font-semibold" />
-            </div>
+            <PreviewRow key={r.rawIndex} row={r} />
           ))}
-          {validCount > preview.length && (
+          {fresh.length > preview.length && (
             <p className="px-3 py-2 text-xs text-slate-400">
-              … y {validCount - preview.length} más
+              … y {fresh.length - preview.length} más
             </p>
           )}
         </Card>
+      )}
+
+      {existingRows.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium text-slate-700">
+              Ya existen en tus movimientos
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                setForced(allForced ? new Set() : new Set(existingRows.map((r) => r.rawIndex)))
+              }
+              className="text-xs font-medium text-indigo-600 hover:underline"
+            >
+              {allForced ? 'Desmarcar todas' : 'Importar todas igualmente'}
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            No se importarán salvo que las marques.
+          </p>
+          <Card className="divide-y divide-slate-100">
+            {existingRows.map((r) => (
+              <label
+                key={r.rawIndex}
+                className="flex cursor-pointer items-center gap-3 px-3 py-2"
+              >
+                <input
+                  type="checkbox"
+                  checked={forced.has(r.rawIndex)}
+                  onChange={() => toggleForced(r.rawIndex)}
+                  aria-label={`Importar igualmente: ${r.concepto || r.categoria}`}
+                  className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
+                />
+                <PreviewRow row={r} bare />
+              </label>
+            ))}
+          </Card>
+        </div>
       )}
 
       {errors.length > 0 && (
@@ -556,6 +697,20 @@ function ConfirmStep({
   )
 }
 
+function PreviewRow({ row: r, bare }: { row: ParsedRow; bare?: boolean }) {
+  return (
+    <div className={cn('flex min-w-0 flex-1 items-center gap-2 text-sm', !bare && 'px-3 py-2')}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-medium text-slate-800">{r.concepto || '(sin concepto)'}</p>
+        <p className="truncate text-xs text-slate-500">
+          {r.dateISO ? formatDate(r.dateISO) : '—'} · {r.tipoRaw} · {r.categoria}
+        </p>
+      </div>
+      <Money cents={r.amountCents ?? 0} className="shrink-0 font-semibold" />
+    </div>
+  )
+}
+
 function Summary({
   label,
   value,
@@ -563,10 +718,11 @@ function Summary({
 }: {
   label: string
   value: number
-  tone: 'emerald' | 'rose' | 'slate'
+  tone: 'emerald' | 'rose' | 'slate' | 'amber'
 }) {
   const toneClass = {
     emerald: 'bg-emerald-50 text-emerald-700',
+    amber: 'bg-amber-50 text-amber-700',
     rose: 'bg-rose-50 text-rose-700',
     slate: 'bg-slate-100 text-slate-600',
   }[tone]
