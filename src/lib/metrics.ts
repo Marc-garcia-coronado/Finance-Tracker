@@ -381,3 +381,27 @@ export function expenseSeries(
   }
   return { months, categories }
 }
+
+// ---------------------------------------------------------------------------
+// Objetivos con fecha límite
+// ---------------------------------------------------------------------------
+export type RequiredContribution =
+  | { status: 'done' } // ya alcanzado
+  | { status: 'expired' } // la fecha límite ya pasó y falta dinero
+  | { status: 'ok'; monthsLeft: number; cents: number }
+
+// Aportación mensual necesaria para llegar a la meta a tiempo. Se aporta una vez
+// al mes, desde el mes actual hasta el mes de la fecha límite (ambos incluidos);
+// por eso un objetivo con fecha en este mismo mes cuenta 1 mes.
+// `deadline` y `today` son 'YYYY-MM-DD'.
+export function requiredMonthlyContribution(
+  remainingCents: number,
+  deadline: string,
+  today: string,
+): RequiredContribution {
+  if (remainingCents <= 0) return { status: 'done' }
+  if (deadline < today) return { status: 'expired' }
+  const idx = (d: string) => Number(d.slice(0, 4)) * 12 + Number(d.slice(5, 7))
+  const monthsLeft = idx(deadline) - idx(today) + 1
+  return { status: 'ok', monthsLeft, cents: Math.ceil(remainingCents / monthsLeft) }
+}

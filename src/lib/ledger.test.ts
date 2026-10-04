@@ -5,6 +5,7 @@ import {
   liveLedgerLines,
   monthlyTotalsFromLedger,
   netWorthFromLedger,
+  transferNetByAccount,
   type EntryLineRow,
   type EntryRow,
   type Ledger,
@@ -160,5 +161,32 @@ describe('ajustes y consumo', () => {
     expect(monthlyTotalsFromLedger(l)).toEqual([])
     expect(balancesFromLedger(l).find((b) => b.account_id === 'cc')?.balance_cents).toBe(10000)
     expect(netWorthFromLedger(l).at(-1)?.cents).toBe(10000)
+  })
+})
+
+describe('transferNetByAccount', () => {
+  const l = (account_id: string, kind: LedgerLine['kind'], month: string, cents: number): LedgerLine => ({
+    account_id,
+    kind,
+    month,
+    cents,
+  })
+  const lines: LedgerLine[] = [
+    l('ahorro', 'transfer', '2026-05', 20000), // aportación
+    l('cc', 'transfer', '2026-05', -20000),
+    l('ahorro', 'transfer', '2026-05', -5000), // retirada
+    l('ahorro', 'income', '2026-05', 99900), // un ingreso directo no es aportación
+    l('ahorro', 'transfer', '2026-04', 7000), // otro mes
+    l('ahorro', 'adjustment', '2026-05', 1234), // un ajuste tampoco
+  ]
+
+  it('suma solo los traspasos del mes (recibido - retirado)', () => {
+    const m = transferNetByAccount({ accounts: ledger.accounts, lines }, '2026-05')
+    expect(m.get('ahorro')).toBe(15000)
+    expect(m.get('cc')).toBe(-20000)
+  })
+
+  it('sin traspasos ese mes: vacío', () => {
+    expect(transferNetByAccount({ accounts: ledger.accounts, lines }, '2026-06').size).toBe(0)
   })
 })

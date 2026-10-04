@@ -10,13 +10,15 @@ import { Money } from '@/components/Money'
 import { ProgressBar } from '@/components/ProgressBar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { tryEuroToCents, formatEuro } from '@/lib/money'
-import { monthsToTarget } from '@/lib/metrics'
+import { monthsToTarget, requiredMonthlyContribution } from '@/lib/metrics'
+import { currentMonthKey, formatDate, todayISO } from '@/lib/dates'
 import {
   useAccounts,
   useBalances,
   useDeleteGoal,
   useGoals,
   useSaveGoal,
+  useTransferInflows,
   type Goal,
 } from '@/lib/queries'
 import { PageTour } from '@/features/onboarding/PageTour'
@@ -26,6 +28,7 @@ export function ObjetivosPage() {
   const goals = useGoals()
   const balances = useBalances()
   const accounts = useAccounts()
+  const inflows = useTransferInflows(currentMonthKey())
   const del = useDeleteGoal()
   const confirmDialog = useConfirm()
   const [editing, setEditing] = useState<Goal | null>(null)
@@ -84,6 +87,13 @@ export function ObjetivosPage() {
             const remaining = Math.max(0, g.target_cents - actual)
             const progress = g.target_cents > 0 ? actual / g.target_cents : 0
             const months = monthsToTarget(remaining, g.monthly_contribution_cents)
+            const required = g.deadline
+              ? requiredMonthlyContribution(remaining, g.deadline, todayISO())
+              : null
+            // Aportación real del mes: traspasos netos a la cuenta vinculada.
+            const contributed = g.linked_account_id
+              ? Math.max(0, inflows.data?.get(g.linked_account_id) ?? 0)
+              : null
             return (
               <Card key={g.id} className="p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -127,6 +137,56 @@ export function ObjetivosPage() {
                         ? ' · sin aportación mensual definida'
                         : ` · ~${months} mes(es) al ritmo actual`}
                   </p>
+
+                  {g.deadline && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      Fecha límite {formatDate(g.deadline)}
+                      {required?.status === 'ok' && (
+                        <>
+                          {' · necesitas '}
+                          <strong className="font-semibold text-slate-700">
+                            {formatEuro(required.cents)}/mes
+                          </strong>
+                          {` durante ${required.monthsLeft} mes(es)`}
+                        </>
+                      )}
+                    </p>
+                  )}
+                  {required?.status === 'expired' && (
+                    <p className="mt-1 text-xs font-medium text-rose-600">
+                      La fecha límite ya ha pasado y todavía falta dinero.
+                    </p>
+                  )}
+                  {required?.status === 'ok' &&
+                    (required.cents > g.monthly_contribution_cents ? (
+                      <p className="mt-1 text-xs font-medium text-amber-600">
+                        ⚠ Tu aportación planificada ({formatEuro(g.monthly_contribution_cents)}/mes)
+                        no llega: te faltan {formatEuro(required.cents - g.monthly_contribution_cents)}
+                        /mes.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs font-medium text-emerald-600">
+                        ✓ Con tu aportación planificada llegas a tiempo.
+                      </p>
+                    ))}
+
+                  {contributed !== null && (
+                    <div className="mt-3 border-t border-slate-100 pt-3">
+                      <div className="flex justify-between text-xs text-slate-500">
+                        <span>Aportado este mes</span>
+                        <span className="tabular-nums text-slate-700">
+                          {formatEuro(contributed)} de {formatEuro(g.monthly_contribution_cents)}{' '}
+                          planificados
+                        </span>
+                      </div>
+                      {g.monthly_contribution_cents > 0 && (
+                        <ProgressBar
+                          className="mt-1.5"
+                          value={Math.min(1, contributed / g.monthly_contribution_cents)}
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               </Card>
             )
@@ -162,6 +222,7 @@ const schema = z.object({
     return c !== null && c >= 0
   }, 'Aportación no válida'),
   linked_account_id: z.string(),
+  deadline: z.string(), // '' = sin fecha límite
 })
 type FormValues = z.infer<typeof schema>
 
@@ -187,6 +248,7 @@ function GoalForm({
       target: goal ? String(goal.target_cents / 100).replace('.', ',') : '',
       monthly: goal ? String(goal.monthly_contribution_cents / 100).replace('.', ',') : '',
       linked_account_id: goal?.linked_account_id ?? '',
+      deadline: goal?.deadline ?? '',
     },
   })
 
@@ -198,6 +260,7 @@ function GoalForm({
         target_cents: tryEuroToCents(v.target)!,
         monthly_contribution_cents: tryEuroToCents(v.monthly)!,
         linked_account_id: v.linked_account_id || null,
+        deadline: v.deadline || null,
       })
       onDone()
     } catch (e) {
@@ -218,6 +281,14 @@ function GoalForm({
           <Input id="monthly" inputMode="decimal" placeholder="0,00" invalid={!!errors.monthly} {...register('monthly')} />
         </Field>
       </div>
+      <Field
+        label="Fecha límite (opcional)"
+        htmlFor="deadline"
+        hint="Calcula cuánto necesitas aportar al mes para llegar a tiempo."
+        error={errors.deadline?.message}
+      >
+        <Input id="deadline" type="date" {...register('deadline')} />
+      </Field>
       <Field
         label="Cuenta vinculada"
         htmlFor="linked_account_id"
