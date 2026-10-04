@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button, Card, Input, Select } from '@/components/ui'
-import { SearchIcon } from '@/components/icons'
+import { DownloadIcon, SearchIcon } from '@/components/icons'
 import { matchesSearch } from '@/lib/search'
 import { isEditableKind } from '@/lib/entryForm'
+import { entriesToCsv } from '@/lib/exportMovements'
+import { saveFile } from '@/lib/saveFile'
 import { Modal } from '@/components/Modal'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { cn } from '@/lib/cn'
-import { formatDate, formatMonthLabel, recentMonths } from '@/lib/dates'
+import { formatDate, formatMonthLabel, recentMonths, todayISO } from '@/lib/dates'
 import {
   useAccounts,
   useEntries,
+  fetchAllEntries,
   useEntriesForSearch,
   useVoidEntry,
   type Account,
@@ -66,6 +69,8 @@ export function MovimientosPage() {
   const [hideVoided, setHideVoided] = useState(false)
   const [searchInput, setSearchInput] = useState('')
   const [page, setPage] = useState(0)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
 
   const search = useDebounced(searchInput.trim(), 300)
   const searching = search.length > 0
@@ -95,6 +100,23 @@ export function MovimientosPage() {
     fn()
   }
 
+  // Exporta lo que coincide con los filtros actuales (y la búsqueda), sin anulados.
+  async function onExport() {
+    setExportError(null)
+    setExporting(true)
+    try {
+      const list = await fetchAllEntries({ ...serverFilters, hideVoided: true })
+      const matching = search ? list.filter((e) => matchesSearch(e.description, search)) : list
+      const accountsById = new Map((accounts.data ?? []).map((a) => [a.id, a]))
+      const filename = `movimientos-${month === 'all' ? 'todos' : month}-${todayISO()}.csv`
+      await saveFile(filename, entriesToCsv(matching, accountsById))
+    } catch (e) {
+      setExportError(e instanceof Error ? e.message : 'No se pudo exportar')
+    } finally {
+      setExporting(false)
+    }
+  }
+
   async function onVoid(id: string) {
     if (!confirm('¿Anular este movimiento? Se creará su inverso (no se borra).')) return
     try {
@@ -115,10 +137,25 @@ export function MovimientosPage() {
             <Button variant="secondary" onClick={() => setImportOpen(true)}>
               Importar
             </Button>
+            <Button
+              variant="secondary"
+              onClick={onExport}
+              loading={exporting}
+              title="Exporta a CSV los movimientos que coinciden con los filtros (sin anulados). Los ajustes no se pueden reimportar."
+            >
+              {!exporting && <DownloadIcon className="h-4 w-4" />}
+              Exportar
+            </Button>
             <Button onClick={() => setOpen(true)}>Nuevo</Button>
           </div>
         }
       />
+
+      {exportError && (
+        <p className="mb-3 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700" role="alert">
+          No se pudo exportar: {exportError}
+        </p>
+      )}
 
       <div className="relative mb-3">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
