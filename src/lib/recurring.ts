@@ -6,20 +6,11 @@ import { decryptCents, encryptCents } from './crypto/webcrypto'
 import type { Json, Tables } from './database.types'
 import { addDays, format, parseISO } from 'date-fns'
 import { pendingDates } from './recurringDates'
+import { entrySignature, type SignatureLine } from './entrySignature'
 
 export type GenerateResult = { created: number; skipped: number }
 
-type Line = { account_id: string; cents: number }
-
-// Firma determinista de un movimiento (importes ya descifrados). NO usa la
-// descripción (que va cifrada con IV aleatorio): basta fecha + tipo + líneas.
-function signature(occurredOn: string, kind: string, lines: Line[]): string {
-  const l = lines
-    .map((x) => `${x.account_id}:${x.cents}`)
-    .sort()
-    .join('|')
-  return `${occurredOn}|${kind}|${l}`
-}
+type Line = SignatureLine
 
 type Template = Tables<'recurring_templates'>
 
@@ -29,15 +20,16 @@ async function loadActiveTemplates(): Promise<Template[]> {
   return data ?? []
 }
 
-// Firmas de los movimientos existentes con fecha en [start, endExclusive).
+// Firmas de los movimientos existentes con fecha en [start, endExclusive), con
+// el nº de movimientos que comparten cada firma.
 // includeVoided: cuenta también los anulados como existentes (la generación
 // automática no debe recrear un recurrente que se anuló a propósito).
-async function loadExistingSignatures(
+export async function loadExistingSignatures(
   key: CryptoKey,
   start: string,
   endExclusive: string,
   includeVoided: boolean,
-): Promise<Set<string>> {
+): Promise<Map<string, number>> {
   const existing = await fetchAll((from, to) =>
     supabase
       .from('entries')
@@ -48,7 +40,7 @@ async function loadExistingSignatures(
       .range(from, to),
   )
 
-  const sigs = new Set<string>()
+  const sigs = new Map<string, number>()
   for (const e of existing as unknown as {
     occurred_on: string
     kind: string
@@ -62,7 +54,8 @@ async function loadExistingSignatures(
         cents: l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0),
       })),
     )
-    sigs.add(signature(e.occurred_on, e.kind, lines))
+    const sig = entrySignature(e.occurred_on, e.kind, lines)
+    sigs.set(sig, (sigs.get(sig) ?? 0) + 1)
   }
   return sigs
 }
@@ -73,14 +66,14 @@ async function createFromTemplate(
   key: CryptoKey,
   t: Template,
   occurredOn: string,
-  sigs: Set<string>,
+  sigs: Map<string, number>,
 ): Promise<boolean> {
   const amount = t.amount_enc != null ? await decryptCents(key, t.amount_enc) : (t.amount_cents ?? 0)
   const lines: Line[] = [
     { account_id: t.from_account_id, cents: -amount },
     { account_id: t.to_account_id, cents: amount },
   ]
-  const sig = signature(occurredOn, t.kind, lines)
+  const sig = entrySignature(occurredOn, t.kind, lines)
   if (sigs.has(sig)) return false
 
   const encLines: Json = await Promise.all(
@@ -100,7 +93,7 @@ async function createFromTemplate(
   })
   if (error) throw new Error(error.message)
 
-  sigs.add(sig)
+  sigs.set(sig, (sigs.get(sig) ?? 0) + 1)
   return true
 }
 
