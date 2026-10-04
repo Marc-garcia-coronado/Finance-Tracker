@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  OTHERS_ID,
   budgetVsActual,
+  expenseSeries,
+  expenseTrends,
   monthlyConsumo,
   monthsToTarget,
   netWorthSeries,
   savingsRate,
+  shiftMonth,
   yearConsumo,
   type MonthlyTotalRow,
 } from './metrics'
@@ -179,5 +183,99 @@ describe('monthsToTarget', () => {
   })
   it('null si el ritmo es 0', () => {
     expect(monthsToTarget(100000, 0)).toBeNull()
+  })
+})
+
+describe('shiftMonth', () => {
+  it('cruza el cambio de año en ambos sentidos', () => {
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12')
+    expect(shiftMonth('2025-12', 1)).toBe('2026-01')
+    expect(shiftMonth('2026-03', -14)).toBe('2025-01')
+    expect(shiftMonth('2026-03', 0)).toBe('2026-03')
+  })
+})
+
+describe('expenseTrends', () => {
+  const ocio = (month: string, total_cents: number) =>
+    mt({ month, account_id: 'ocio', name: 'Ocio', total_cents })
+  const comida = (month: string, total_cents: number) =>
+    mt({ month, account_id: 'comida', name: 'Comida', total_cents })
+
+  it('compara con el mes anterior y con la media de los meses previos', () => {
+    const data = [ocio('2026-03', 10000), ocio('2026-04', 20000), ocio('2026-05', 40000)]
+    const [row] = expenseTrends(data, '2026-05')
+    expect(row).toMatchObject({
+      accountId: 'ocio',
+      cents: 40000,
+      prevCents: 20000,
+      vsPrev: 1, // +100 %
+      avgCents: 15000, // media de marzo y abril (los meses previos con datos)
+    })
+    expect(row!.vsAvg).toBeCloseTo((40000 - 15000) / 15000)
+  })
+
+  it('la media solo cuenta los meses desde el primero con datos', () => {
+    // La app empieza en marzo: enero y febrero no son «meses sin gasto».
+    const data = [comida('2026-03', 30000), comida('2026-04', 30000)]
+    expect(expenseTrends(data, '2026-04')[0]!.avgCents).toBe(30000)
+  })
+
+  it('la media usa como mucho `window` meses', () => {
+    const data = [ocio('2025-01', 999999), ocio('2025-06', 1000), ocio('2026-06', 2000)]
+    // ventana de 12 meses antes de 2026-06: de 2025-06 a 2026-05 (2025-01 queda fuera)
+    expect(expenseTrends(data, '2026-06', 12)[0]!.avgCents).toBe(Math.round(1000 / 12))
+  })
+
+  it('sin gasto el mes anterior o sin historial no hay variación', () => {
+    const [row] = expenseTrends([ocio('2026-05', 5000)], '2026-05')
+    expect(row).toMatchObject({ prevCents: 0, vsPrev: null, avgCents: null, vsAvg: null })
+  })
+
+  it('una categoría que antes no se gastaba cuenta como 0 en la media', () => {
+    const data = [comida('2026-03', 100), ocio('2026-05', 6000), comida('2026-05', 100)]
+    const ocioRow = expenseTrends(data, '2026-05').find((r) => r.accountId === 'ocio')!
+    expect(ocioRow.avgCents).toBe(0)
+    expect(ocioRow.vsAvg).toBeNull() // media 0: no hay base
+  })
+
+  it('solo incluye gastos del mes, ordenados de mayor a menor, e ignora ingresos', () => {
+    const data = [
+      ocio('2026-05', 1000),
+      comida('2026-05', 5000),
+      comida('2026-04', 1),
+      mt({ month: '2026-05', type: 'income', account_id: 'trabajo', total_cents: -90000 }),
+      ocio('2026-04', 700),
+    ]
+    expect(expenseTrends(data, '2026-05').map((r) => r.accountId)).toEqual(['comida', 'ocio'])
+    expect(expenseTrends(data, '2026-06')).toEqual([])
+  })
+})
+
+describe('expenseSeries', () => {
+  const g = (month: string, account_id: string, total_cents: number) =>
+    mt({ month, account_id, name: account_id, total_cents })
+
+  it('devuelve `count` meses terminando en endMonth, rellenando con 0', () => {
+    const s = expenseSeries([g('2026-05', 'a', 100)], '2026-05', 3)
+    expect(s.months).toEqual(['2026-03', '2026-04', '2026-05'])
+    expect(s.categories).toEqual([{ accountId: 'a', name: 'a', values: [0, 0, 100] }])
+  })
+
+  it('agrupa en «Otras» lo que no entra en el top, ordenado por gasto total', () => {
+    const data = [
+      g('2026-05', 'a', 500),
+      g('2026-05', 'b', 400),
+      g('2026-05', 'c', 300),
+      g('2026-04', 'c', 50),
+      g('2026-05', 'd', 10),
+    ]
+    const s = expenseSeries(data, '2026-05', 2, 2)
+    expect(s.categories.map((c) => c.accountId)).toEqual(['a', 'b', OTHERS_ID])
+    expect(s.categories[2]).toMatchObject({ name: 'Otras', values: [50, 310] })
+  })
+
+  it('no añade «Otras» si no sobra nada y excluye meses fuera de la ventana', () => {
+    const s = expenseSeries([g('2025-01', 'a', 100), g('2026-05', 'b', 100)], '2026-05', 3)
+    expect(s.categories.map((c) => c.accountId)).toEqual(['b'])
   })
 })
