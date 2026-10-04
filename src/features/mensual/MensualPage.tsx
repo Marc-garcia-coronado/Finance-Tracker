@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, Select } from '@/components/ui'
 import { Money } from '@/components/Money'
@@ -11,7 +11,8 @@ import {
   monthlyConsumo,
   yearConsumo,
 } from '@/lib/metrics'
-import { useMonthlyTotals } from '@/lib/queries'
+import { groupByBucket } from '@/lib/accountTree'
+import { useAccounts, useMonthlyTotals } from '@/lib/queries'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { BudgetCard } from './BudgetCard'
 import { TrendsCard } from './TrendsCard'
@@ -19,6 +20,7 @@ import { showTour } from '@/features/onboarding/tourStorage'
 
 export function MensualPage() {
   const totals = useMonthlyTotals()
+  const accounts = useAccounts()
   const [month, setMonth] = useState<string>(currentMonthKey())
 
   const months = useMemo(() => {
@@ -34,6 +36,8 @@ export function MensualPage() {
   const data = totals.data ?? []
   const ingresos = incomeByCategory(data, month)
   const gastos = expenseByCategory(data, month)
+  // Las subcategorías se agrupan bajo su bucket (Config).
+  const gastosAgrupados = groupByBucket(gastos, accounts.data ?? [])
   const consumo = monthlyConsumo(data, month)
   const year = Number(month.slice(0, 4))
   const anual = yearConsumo(data, year)
@@ -76,8 +80,16 @@ export function MensualPage() {
           <BudgetCard month={month} />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <CategoryTable title="Ingresos por categoría" rows={ingresos} totalCents={consumo.incomeCents} />
-            <CategoryTable title="Gastos por categoría" rows={gastos} totalCents={consumo.expenseCents} />
+            <CategoryTable
+              title="Ingresos por categoría"
+              rows={ingresos.map((r) => ({ ...r, children: [] }))}
+              totalCents={consumo.incomeCents}
+            />
+            <CategoryTable
+              title="Gastos por categoría"
+              rows={gastosAgrupados}
+              totalCents={consumo.expenseCents}
+            />
           </div>
 
           <TrendsCard totals={data} month={month} />
@@ -102,7 +114,12 @@ function CategoryTable({
   totalCents,
 }: {
   title: string
-  rows: { accountId: string; name: string; cents: number }[]
+  rows: {
+    accountId: string
+    name: string
+    cents: number
+    children: { accountId: string; name: string; cents: number }[]
+  }[]
   totalCents: number
 }) {
   return (
@@ -116,12 +133,25 @@ function CategoryTable({
         <table className="w-full text-sm">
           <tbody>
             {rows.map((r) => (
-              <tr key={r.accountId} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-2.5 text-slate-700">{r.name}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <Money cents={r.cents} />
-                </td>
-              </tr>
+              <Fragment key={r.accountId}>
+                <tr className="border-b border-slate-100 last:border-0">
+                  <td className="px-4 py-2.5 text-slate-700">{r.name}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <Money cents={r.cents} />
+                  </td>
+                </tr>
+                {r.children.map((c) => (
+                  <tr key={c.accountId} className="border-b border-slate-100 bg-slate-50/60 text-xs">
+                    <td className="py-1.5 pl-8 pr-4 text-slate-500">
+                      <span className="mr-1 text-slate-300">↳</span>
+                      {c.name}
+                    </td>
+                    <td className="px-4 py-1.5 text-right text-slate-600">
+                      <Money cents={c.cents} />
+                    </td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
           </tbody>
           <tfoot>

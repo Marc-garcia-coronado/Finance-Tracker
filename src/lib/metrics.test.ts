@@ -322,3 +322,40 @@ describe('requiredMonthlyContribution', () => {
     })
   })
 })
+
+describe('budgetVsActual con subcategorías', () => {
+  const accountsById = new Map([
+    ['nec', { name: 'Necesidades', type: 'expense' as const, is_budget_bucket: true, is_archived: false }],
+    [
+      'super',
+      { name: 'Supermercado', type: 'expense' as const, is_budget_bucket: false, is_archived: false, parent_id: 'nec' },
+    ],
+  ])
+
+  it('suma lo gastado en las subcategorías al bucket padre', () => {
+    const rows = budgetVsActual({
+      allocations: [{ account_id: 'nec', percent: 50 }],
+      accountsById,
+      totals: [
+        mt({ month: '2026-06', account_id: 'nec', total_cents: 10000 }),
+        mt({ month: '2026-06', account_id: 'super', total_cents: 30000 }),
+        mt({ month: '2026-05', account_id: 'super', total_cents: 99999 }), // otro mes
+      ],
+      month: '2026-06',
+      baseCents: 100000,
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ accountId: 'nec', budgetCents: 50000, actualCents: 40000 })
+  })
+
+  it('sin parent_id el comportamiento no cambia', () => {
+    const rows = budgetVsActual({
+      allocations: [{ account_id: 'nec', percent: 50 }],
+      accountsById: new Map([['nec', accountsById.get('nec')!]]),
+      totals: [mt({ month: '2026-06', account_id: 'nec', total_cents: 10000 })],
+      month: '2026-06',
+      baseCents: 100000,
+    })
+    expect(rows[0]!.actualCents).toBe(10000)
+  })
+})

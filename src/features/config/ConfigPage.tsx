@@ -19,6 +19,7 @@ import {
   type Account,
 } from '@/lib/queries'
 import type { Enums } from '@/lib/database.types'
+import { childrenOf, orderWithChildren, parentOptions } from '@/lib/accountTree'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { showOnboarding, showTour } from '@/features/onboarding/tourStorage'
 
@@ -284,9 +285,13 @@ function AccountsCard({ accounts }: { accounts: Account[] }) {
                 {TYPE_LABEL[g]}
               </p>
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
-                {items.map((a) => (
-                  <div key={a.id} className="flex items-center gap-2 px-3 py-2">
+                {orderWithChildren(items).map(({ account: a, depth }) => (
+                  <div
+                    key={a.id}
+                    className={cn('flex items-center gap-2 px-3 py-2', depth === 1 && 'bg-slate-50/60 pl-8')}
+                  >
                     <span className={cn('flex-1 text-sm', a.is_archived ? 'text-slate-400 line-through' : 'text-slate-800')}>
+                      {depth === 1 && <span className="mr-1 text-slate-300">↳</span>}
                       {a.name}
                     </span>
                     {a.is_budget_bucket && (
@@ -329,12 +334,22 @@ function AccountsCard({ accounts }: { accounts: Account[] }) {
 function AccountForm({ account, onDone }: { account: Account | null; onDone: () => void }) {
   const save = useSaveAccount()
   const withMovements = useAccountIdsWithMovements()
-  // Mientras carga el ledger (o si falla) se bloquea por seguridad.
-  const typeLocked = !!account && (withMovements.data?.has(account.id) ?? true)
+  const allAccounts = useAccounts().data ?? []
+  const hasChildren = !!account && childrenOf(allAccounts, account.id).length > 0
+  // Mientras carga el ledger (o si falla) se bloquea por seguridad. Una cuenta
+  // con subcategorías tampoco puede dejar de ser de gasto.
+  const movementsLock = !!account && (withMovements.data?.has(account.id) ?? true)
+  const typeLocked = movementsLock || hasChildren
   const [name, setName] = useState(account?.name ?? '')
   const [type, setType] = useState<Enums<'account_type'>>(account?.type ?? 'expense')
   const [bucket, setBucket] = useState(account?.is_budget_bucket ?? false)
+  const [parentId, setParentId] = useState(account?.parent_id ?? '')
   const [error, setError] = useState<string | null>(null)
+  // Si el padre actual se archivó, se mantiene como opción para no perderlo.
+  const parentChoices = parentOptions(allAccounts, account?.id)
+  const currentParent = allAccounts.find((a) => a.id === account?.parent_id)
+  if (currentParent && !parentChoices.some((p) => p.id === currentParent.id))
+    parentChoices.push(currentParent)
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -349,6 +364,8 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
         name: name.trim(),
         type,
         is_budget_bucket: bucket,
+        // Solo las categorías de gasto que no son bucket cuelgan de un bucket.
+        parent_id: type === 'expense' && !bucket ? parentId || null : null,
       })
       onDone()
     } catch (err) {
@@ -365,11 +382,13 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
         label="Tipo"
         htmlFor="acc-type"
         hint={
-          typeLocked
+          movementsLock
             ? withMovements.isPending
               ? 'Comprobando si la cuenta tiene movimientos…'
               : 'No se puede cambiar el tipo: la cuenta ya tiene movimientos.'
-            : undefined
+            : hasChildren
+              ? 'No se puede cambiar el tipo: tiene subcategorías.'
+              : undefined
         }
       >
         <Select
@@ -383,14 +402,45 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
           <option value="expense">Categoría de gasto</option>
         </Select>
       </Field>
+      {type === 'expense' && (
+        <Field
+          label="Subcategoría de"
+          htmlFor="acc-parent"
+          hint={
+            hasChildren
+              ? 'Esta categoría tiene subcategorías, no puede colgar de otra.'
+              : bucket
+                ? 'Un bucket no puede ser subcategoría.'
+                : 'Opcional: su gasto se suma al de ese bucket en el presupuesto.'
+          }
+        >
+          <Select
+            id="acc-parent"
+            value={parentId}
+            disabled={bucket || hasChildren}
+            onChange={(e) => setParentId(e.target.value)}
+          >
+            <option value="">Ninguna (categoría independiente)</option>
+            {parentChoices.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input
           type="checkbox"
           className="h-4 w-4 rounded border-slate-300"
           checked={bucket}
+          disabled={type === 'expense' && !!parentId}
           onChange={(e) => setBucket(e.target.checked)}
         />
         Usar en la asignación por % (bucket)
+        {type === 'expense' && parentId && (
+          <span className="text-xs text-slate-400">(es una subcategoría)</span>
+        )}
       </label>
 
       {error && (

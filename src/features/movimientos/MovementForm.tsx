@@ -6,8 +6,15 @@ import { Button, Field, Input, Select } from '@/components/ui'
 import { tryEuroToCents } from '@/lib/money'
 import { todayISO } from '@/lib/dates'
 import { entryToFormValues, type MovementFormValues } from '@/lib/entryForm'
-import { useAccounts, useCreateEntry, useReplaceEntry, type EntryWithLines } from '@/lib/queries'
+import {
+  useAccounts,
+  useCreateEntry,
+  useReplaceEntry,
+  type Account,
+  type EntryWithLines,
+} from '@/lib/queries'
 import type { EntryKind } from '@/lib/entries'
+import { qualifiedName } from '@/lib/accountTree'
 import {
   pickDefaultAccount,
   readLastExpenseAccount,
@@ -141,7 +148,10 @@ export function MovementForm({ onDone, entry }: { onDone: () => void; entry?: En
   }
 
   const labels = KIND_LABEL[kind]
-  const label = (a: { name: string; is_archived: boolean }) => a.name + (a.is_archived ? ' (archivada)' : '')
+  const accountsById = new Map((accounts.data ?? []).map((a) => [a.id, a]))
+  // Las subcategorías se muestran con su bucket: «Supermercado · Necesidades».
+  const label = (a: Account) =>
+    qualifiedName(a, accountsById) + (a.is_archived ? ' (archivada)' : '')
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>

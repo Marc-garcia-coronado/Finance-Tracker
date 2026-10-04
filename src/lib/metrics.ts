@@ -135,7 +135,12 @@ export const BUDGET_NEAR_RATIO = 0.8
 
 export function budgetVsActual(args: {
   allocations: { account_id: string; percent: number }[]
-  accountsById: Map<string, Pick<Account, 'name' | 'type' | 'is_budget_bucket' | 'is_archived'>>
+  accountsById: Map<
+    string,
+    Pick<Account, 'name' | 'type' | 'is_budget_bucket' | 'is_archived'> & {
+      parent_id?: string | null
+    }
+  >
   totals: MonthlyTotal[]
   month: string
   baseCents: number
@@ -143,7 +148,10 @@ export function budgetVsActual(args: {
   const { allocations, accountsById, totals, month, baseCents } = args
   const actualById = new Map<string, number>()
   for (const t of totals) {
-    if (t.month === month) actualById.set(t.account_id, (actualById.get(t.account_id) ?? 0) + t.total_cents)
+    if (t.month !== month) continue
+    // Lo gastado en una subcategoría cuenta en su bucket (parent_id).
+    const target = accountsById.get(t.account_id)?.parent_id ?? t.account_id
+    actualById.set(target, (actualById.get(target) ?? 0) + t.total_cents)
   }
 
   const rows: BudgetRow[] = []

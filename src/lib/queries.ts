@@ -627,20 +627,23 @@ export function useSaveAccount() {
       name: string
       type: Enums<'account_type'>
       is_budget_bucket: boolean
+      // undefined = no tocar el bucket padre; null = quitarlo.
+      parent_id?: string | null
     }): Promise<string> => {
       const key = requireSessionKey()
       const encName = await encryptString(key, input.name)
+      const parent = input.parent_id === undefined ? {} : { parent_id: input.parent_id }
       if (input.id) {
         const { error } = await supabase
           .from('accounts')
-          .update({ name: encName, type: input.type, is_budget_bucket: input.is_budget_bucket })
+          .update({ name: encName, type: input.type, is_budget_bucket: input.is_budget_bucket, ...parent })
           .eq('id', input.id)
         if (error) throw new Error(error.message)
         return input.id
       }
       const { data, error } = await supabase
         .from('accounts')
-        .insert({ name: encName, type: input.type, is_budget_bucket: input.is_budget_bucket })
+        .insert({ name: encName, type: input.type, is_budget_bucket: input.is_budget_bucket, ...parent })
         .select('id')
         .single()
       if (error) throw new Error(error.message)

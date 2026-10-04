@@ -23,6 +23,7 @@ export type Database = {
           type: Database['public']['Enums']['account_type']
           is_budget_bucket: boolean
           is_archived: boolean
+          parent_id: string | null
           created_at: string
         }
         Insert: {
@@ -32,6 +33,7 @@ export type Database = {
           type: Database['public']['Enums']['account_type']
           is_budget_bucket?: boolean
           is_archived?: boolean
+          parent_id?: string | null
           created_at?: string
         }
         Update: {
@@ -41,9 +43,18 @@ export type Database = {
           type?: Database['public']['Enums']['account_type']
           is_budget_bucket?: boolean
           is_archived?: boolean
+          parent_id?: string | null
           created_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'accounts_parent_id_fkey'
+            columns: ['parent_id']
+            isOneToOne: false
+            referencedRelation: 'accounts'
+            referencedColumns: ['id']
+          },
+        ]
       }
       entries: {
         Row: {
