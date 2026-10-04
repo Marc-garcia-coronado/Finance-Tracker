@@ -8,6 +8,11 @@ import { todayISO } from '@/lib/dates'
 import { entryToFormValues, type MovementFormValues } from '@/lib/entryForm'
 import { useAccounts, useCreateEntry, useReplaceEntry, type EntryWithLines } from '@/lib/queries'
 import type { EntryKind } from '@/lib/entries'
+import {
+  pickDefaultAccount,
+  readLastExpenseAccount,
+  saveLastExpenseAccount,
+} from '@/lib/lastAccount'
 
 const schema = z
   .object({
@@ -56,6 +61,7 @@ export function MovementForm({ onDone, entry }: { onDone: () => void; entry?: En
     register,
     handleSubmit,
     watch,
+    getValues,
     setValue,
     setError,
     formState: { errors, isSubmitting, isDirty },
@@ -90,6 +96,18 @@ export function MovementForm({ onDone, entry }: { onDone: () => void; entry?: En
     setValue('toAccountId', '')
   }, [kind, setValue])
 
+  // Alta nueva: preselecciona la última cuenta usada para gastos, una vez
+  // cargadas las cuentas y solo si el usuario aún no ha elegido nada.
+  const accountsLoaded = accounts.data !== undefined
+  useEffect(() => {
+    if (entry || !accountsLoaded) return
+    if (getValues('kind') !== 'expense' || getValues('fromAccountId')) return
+    const assetIds = fromOptions.map((a) => a.id)
+    const last = pickDefaultAccount(readLastExpenseAccount(), assetIds)
+    if (last) setValue('fromAccountId', last)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountsLoaded])
+
   async function onSubmit(values: FormValues) {
     const amountCents = tryEuroToCents(values.amount)
     if (amountCents === null || amountCents <= 0) {
@@ -110,7 +128,10 @@ export function MovementForm({ onDone, entry }: { onDone: () => void; entry?: En
     }
     try {
       if (entry) await replaceEntry.mutateAsync({ id: entry.id, params })
-      else await createEntry.mutateAsync(params)
+      else {
+        await createEntry.mutateAsync(params)
+        if (params.kind === 'expense') saveLastExpenseAccount(params.fromAccountId)
+      }
       onDone()
     } catch (e) {
       setError('root', {
@@ -146,6 +167,7 @@ export function MovementForm({ onDone, entry }: { onDone: () => void; entry?: En
         <Field label="Importe (€)" htmlFor="amount" error={errors.amount?.message}>
           <Input
             id="amount"
+            data-autofocus={entry ? undefined : ''}
             inputMode="decimal"
             placeholder="0,00"
             invalid={!!errors.amount}

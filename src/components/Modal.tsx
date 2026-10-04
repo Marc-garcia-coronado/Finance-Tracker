@@ -20,7 +20,11 @@ export function Modal({
       if (e.key === 'Escape') onClose()
     }
     document.addEventListener('keydown', onKey)
-    ref.current?.querySelector<HTMLElement>('input, select, textarea, button')?.focus()
+    // Un campo con data-autofocus tiene prioridad sobre el primer control (el aspa).
+    const target =
+      ref.current?.querySelector<HTMLElement>('[data-autofocus]') ??
+      ref.current?.querySelector<HTMLElement>('input, select, textarea, button')
+    target?.focus()
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 

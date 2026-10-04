@@ -4,6 +4,7 @@ import { useAutoRecurring } from '@/features/recurrentes/useAutoRecurring'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/cn'
 import { Modal } from './Modal'
+import { MovementForm } from '@/features/movimientos/MovementForm'
 import { OnboardingTour } from '@/features/onboarding/OnboardingTour'
 import {
   ArrowsRightLeftIcon,
@@ -12,6 +13,7 @@ import {
   EllipsisIcon,
   HomeIcon,
   LogoutIcon,
+  PlusIcon,
   RepeatIcon,
   SettingsIcon,
   TargetIcon,
@@ -93,6 +95,7 @@ export function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [moreOpen, setMoreOpen] = useState(false)
+  const [quickOpen, setQuickOpen] = useState(false)
 
   const moreActive = MORE.some((item) => location.pathname.startsWith(item.to))
 
@@ -106,6 +109,33 @@ export function AppLayout() {
     navigate(to)
   }
 
+  function renderTab(item: NavItem) {
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        end={item.end}
+        className={({ isActive }) =>
+          cn(
+            'flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
+            isActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
+          )
+        }
+      >
+        {({ isActive }) => (
+          <>
+            <span
+              className={cn('rounded-full px-3.5 py-0.5 transition', isActive && 'bg-indigo-100/80')}
+            >
+              <item.icon className="h-6 w-6" />
+            </span>
+            {item.label}
+          </>
+        )}
+      </NavLink>
+    )
+  }
+
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
@@ -115,8 +145,15 @@ export function AppLayout() {
           </div>
           <span className="font-bold tracking-tight text-slate-900">Finanzas</span>
           <button
+            onClick={() => setQuickOpen(true)}
+            className="btn-primary ml-auto hidden md:inline-flex"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Nuevo movimiento
+          </button>
+          <button
             onClick={signOut}
-            className="ml-auto hidden text-sm font-medium text-slate-500 hover:text-slate-900 md:block"
+            className="hidden text-sm font-medium text-slate-500 hover:text-slate-900 md:block"
           >
             Salir
           </button>
@@ -156,34 +193,18 @@ export function AppLayout() {
         aria-label="Secciones"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/70 bg-white/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42_/_0.12)] backdrop-blur-lg md:hidden"
       >
-        <div className="mx-auto grid max-w-md grid-cols-5">
-          {PRIMARY.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                cn(
-                  'flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
-                  isActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
-                )
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  <span
-                    className={cn(
-                      'rounded-full px-3.5 py-0.5 transition',
-                      isActive && 'bg-indigo-100/80',
-                    )}
-                  >
-                    <item.icon className="h-6 w-6" />
-                  </span>
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          ))}
+        <div className="mx-auto grid max-w-md grid-cols-6">
+          {PRIMARY.slice(0, 2).map((item) => renderTab(item))}
+          <button
+            onClick={() => setQuickOpen(true)}
+            aria-label="Añadir movimiento"
+            className="flex items-center justify-center"
+          >
+            <span className="-mt-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/40 transition active:scale-95">
+              <PlusIcon className="h-6 w-6" strokeWidth={2.2} />
+            </span>
+          </button>
+          {PRIMARY.slice(2).map((item) => renderTab(item))}
           <button
             onClick={() => setMoreOpen(true)}
             aria-haspopup="dialog"
@@ -254,6 +275,10 @@ export function AppLayout() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      <Modal open={quickOpen} onClose={() => setQuickOpen(false)} title="Nuevo movimiento">
+        <MovementForm onDone={() => setQuickOpen(false)} />
       </Modal>
 
       <OnboardingTour />
