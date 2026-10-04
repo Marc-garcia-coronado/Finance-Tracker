@@ -18,6 +18,12 @@ export type LedgerLine = {
 
 export type Ledger = { accounts: LedgerAccount[]; lines: LedgerLine[] }
 
+// Ids de las cuentas con alguna línea vigente (no anulada) en el ledger. Su tipo
+// ya no se puede cambiar: reclasificaría de golpe todo su histórico.
+export function accountIdsWithMovements(ledger: Ledger): Set<string> {
+  return new Set(ledger.lines.map((l) => l.account_id))
+}
+
 export type Balance = {
   account_id: string
   name: string
