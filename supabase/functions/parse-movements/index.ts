@@ -144,7 +144,6 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: 1500,
-        temperature: 0,
         system: systemPrompt(today, expense, income),
         tools: [TOOL],
         tool_choice: { type: 'tool', name: TOOL.name },
