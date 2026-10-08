@@ -224,6 +224,7 @@ export type Database = {
           monthly_contribution_cents: number | null
           monthly_contribution_enc: string | null
           linked_account_id: string | null
+          deadline: string | null
           created_at: string
         }
         Insert: {
@@ -235,6 +236,7 @@ export type Database = {
           monthly_contribution_cents?: number | null
           monthly_contribution_enc?: string | null
           linked_account_id?: string | null
+          deadline?: string | null
           created_at?: string
         }
         Update: {
@@ -246,6 +248,7 @@ export type Database = {
           monthly_contribution_cents?: number | null
           monthly_contribution_enc?: string | null
           linked_account_id?: string | null
+          deadline?: string | null
           created_at?: string
         }
         Relationships: [

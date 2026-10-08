@@ -1,3 +1,4 @@
+import { useCallback } from 'react'
 import {
   useMutation,
   useQuery,
@@ -22,6 +23,7 @@ import type { MonthlyTotalRow, NetWorthPoint } from './metrics'
 import {
   accountIdsWithMovements,
   liveLedgerLines,
+  transferNetByAccount,
   balancesFromLedger,
   monthlyTotalsFromLedger,
   netWorthFromLedger,
@@ -47,6 +49,7 @@ export type Goal = {
   target_cents: number
   monthly_contribution_cents: number
   linked_account_id: string | null
+  deadline: string | null // 'YYYY-MM-DD'
   created_at: string
 }
 export type Recurring = {
@@ -209,6 +212,7 @@ export function useGoals(): UseQueryResult<Goal[]> {
               ? await decryptCents(key, g.monthly_contribution_enc)
               : (g.monthly_contribution_cents ?? 0),
           linked_account_id: g.linked_account_id,
+          deadline: g.deadline,
           created_at: g.created_at,
         })),
       )
@@ -249,6 +253,12 @@ export function useRecurring(): UseQueryResult<Recurring[]> {
 // así que solo se recalculan cuando cambia el ledger.
 export function useBalances(): UseQueryResult<Balance[]> {
   return useQuery({ ...ledgerQuery, select: balancesFromLedger })
+}
+
+// Aportación real del mes a cada cuenta (traspasos netos recibidos).
+export function useTransferInflows(month: string): UseQueryResult<Map<string, number>> {
+  const select = useCallback((l: Ledger) => transferNetByAccount(l, month), [month])
+  return useQuery({ ...ledgerQuery, select })
 }
 
 // Cuentas con movimientos (su tipo no se puede cambiar).
@@ -669,6 +679,7 @@ export function useSaveGoal() {
       target_cents: number
       monthly_contribution_cents: number
       linked_account_id: string | null
+      deadline: string | null
     }) => {
       const key = requireSessionKey()
       const fields = {
@@ -678,6 +689,7 @@ export function useSaveGoal() {
         target_cents: null,
         monthly_contribution_cents: null,
         linked_account_id: input.linked_account_id,
+        deadline: input.deadline,
       }
       if (input.id) {
         const { error } = await supabase.from('goals').update(fields).eq('id', input.id)

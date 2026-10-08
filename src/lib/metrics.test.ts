@@ -6,6 +6,7 @@ import {
   expenseTrends,
   monthlyConsumo,
   monthsToTarget,
+  requiredMonthlyContribution,
   netWorthSeries,
   savingsRate,
   shiftMonth,
@@ -277,5 +278,47 @@ describe('expenseSeries', () => {
   it('no añade «Otras» si no sobra nada y excluye meses fuera de la ventana', () => {
     const s = expenseSeries([g('2025-01', 'a', 100), g('2026-05', 'b', 100)], '2026-05', 3)
     expect(s.categories.map((c) => c.accountId)).toEqual(['b'])
+  })
+})
+
+describe('requiredMonthlyContribution', () => {
+  it('reparte lo que falta entre los meses hasta la fecha, incluido el actual', () => {
+    // oct, nov y dic = 3 aportaciones
+    expect(requiredMonthlyContribution(90000, '2026-12-31', '2026-10-04')).toEqual({
+      status: 'ok',
+      monthsLeft: 3,
+      cents: 30000,
+    })
+  })
+
+  it('redondea hacia arriba para llegar a tiempo', () => {
+    expect(requiredMonthlyContribution(100001, '2026-12-15', '2026-10-04')).toMatchObject({
+      cents: 33334,
+    })
+  })
+
+  it('fecha en el mes actual (aún no pasada): un solo mes', () => {
+    expect(requiredMonthlyContribution(5000, '2026-10-30', '2026-10-04')).toEqual({
+      status: 'ok',
+      monthsLeft: 1,
+      cents: 5000,
+    })
+  })
+
+  it('cruza el cambio de año', () => {
+    expect(requiredMonthlyContribution(40000, '2027-02-01', '2026-11-20')).toMatchObject({
+      monthsLeft: 4,
+      cents: 10000,
+    })
+  })
+
+  it('objetivo ya alcanzado, sin importar la fecha', () => {
+    expect(requiredMonthlyContribution(0, '2020-01-01', '2026-10-04')).toEqual({ status: 'done' })
+  })
+
+  it('fecha pasada con dinero pendiente: vencido', () => {
+    expect(requiredMonthlyContribution(100, '2026-10-03', '2026-10-04')).toEqual({
+      status: 'expired',
+    })
   })
 })

@@ -63,6 +63,18 @@ export function accountIdsWithMovements(ledger: Ledger): Set<string> {
   return new Set(ledger.lines.map((l) => l.account_id))
 }
 
+// Entrada neta de traspasos (recibido - retirado) por cuenta en un mes
+// 'YYYY-MM'. Es la «aportación real» a un objetivo: los ingresos y gastos que
+// tocan la cuenta no cuentan, solo los traspasos.
+export function transferNetByAccount(ledger: Ledger, month: string): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const l of ledger.lines) {
+    if (l.kind !== 'transfer' || l.month !== month) continue
+    out.set(l.account_id, (out.get(l.account_id) ?? 0) + l.cents)
+  }
+  return out
+}
+
 export type Balance = {
   account_id: string
   name: string
