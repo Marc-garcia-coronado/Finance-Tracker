@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
 
   // 3. Límite diario por usuario (solo un contador, nunca contenido).
   const { data: allowed, error: quotaError } = await supabase.rpc('take_ai_quota', { p_limit: DAILY_LIMIT })
-  if (quotaError) return json({ error: 'quota_unavailable' }, 500)
+  if (quotaError) return json({ error: 'quota_unavailable', detail: quotaError.message }, 500)
   if (!allowed) return json({ error: 'rate_limited' }, 429)
 
   // 4. Llamada a Anthropic con salida estructurada forzada.
@@ -154,14 +154,17 @@ Deno.serve(async (req) => {
   } catch {
     return json({ error: 'upstream_unreachable' }, 502)
   }
-  if (!upstream.ok) return json({ error: 'upstream_error' }, 502)
-
-  const result = await upstream.json()
+  const result = await upstream.json().catch(() => null)
+  if (!upstream.ok) {
+    // Solo código y mensaje de error de Anthropic: nunca el texto del usuario.
+    const detail = `${upstream.status} ${result?.error?.type ?? ''} ${result?.error?.message ?? ''}`.trim()
+    return json({ error: 'upstream_error', detail }, 502)
+  }
   const block = Array.isArray(result?.content)
     ? result.content.find((b: { type?: string }) => b?.type === 'tool_use')
     : undefined
   const movements = block?.input?.movements
-  if (!Array.isArray(movements)) return json({ error: 'upstream_error' }, 502)
+  if (!Array.isArray(movements)) return json({ error: 'upstream_error', detail: 'respuesta sin movimientos' }, 502)
 
   // El cliente vuelve a validar todo; aquí solo se acota el tamaño.
   return json({ movements: movements.slice(0, MAX_MOVEMENTS) })

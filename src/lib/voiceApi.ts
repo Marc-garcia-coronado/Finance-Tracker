@@ -17,8 +17,9 @@ export async function interpretDictation(payload: VoicePayload): Promise<unknown
   const { data, error } = await supabase.functions.invoke('parse-movements', { body: payload })
   if (error) {
     if (error instanceof FunctionsHttpError) {
-      const body = (await error.context.json().catch(() => null)) as { error?: string } | null
-      throw new Error((body?.error && MESSAGES[body.error]) || FALLBACK)
+      const body = (await error.context.json().catch(() => null)) as { error?: string; detail?: string } | null
+      const known = body?.error ? MESSAGES[body.error] : undefined
+      throw new Error(known ?? (body?.detail ? `${FALLBACK} (${body.detail})` : FALLBACK))
     }
     throw new Error(error instanceof Error && error.message ? error.message : FALLBACK)
   }
