@@ -9,6 +9,8 @@ import { useOnline } from '@/lib/useOnline'
 import { cn } from '@/lib/cn'
 import { Modal } from './Modal'
 import { NewMovementDialog } from '@/features/movimientos/NewMovementDialog'
+import { DemoBanner } from './DemoBanner'
+import { exitDemo } from '@/lib/demo/demoControl'
 import { OnboardingTour } from '@/features/onboarding/OnboardingTour'
 import {
   ArrowsRightLeftIcon,
@@ -122,6 +124,7 @@ export function AppLayout() {
   const moreActive = MORE.some((item) => location.pathname.startsWith(item.to))
 
   async function signOut() {
+    exitDemo() // el modo demo no sobrevive al cierre de sesión
     await supabase.auth.signOut()
     navigate('/login', { replace: true })
   }
@@ -161,6 +164,7 @@ export function AppLayout() {
   return (
     <div className="min-h-full">
       <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
+        <DemoBanner />
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-600/30">
             €

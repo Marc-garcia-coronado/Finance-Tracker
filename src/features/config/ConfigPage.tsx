@@ -20,6 +20,8 @@ import {
 } from '@/lib/queries'
 import type { Enums } from '@/lib/database.types'
 import { childrenOf, orderWithChildren, parentOptions } from '@/lib/accountTree'
+import { enterDemo, exitDemo } from '@/lib/demo/demoControl'
+import { useDemoMode } from '@/lib/demo/demoMode'
 import { setVoiceEnabled, useVoiceEnabled } from '@/lib/voiceSettings'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { showOnboarding, showTour } from '@/features/onboarding/tourStorage'
@@ -45,10 +47,56 @@ export function ConfigPage() {
         incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
       />
       <AccountsCard accounts={accounts.data ?? []} />
+      <DemoCard />
       <VoiceCard />
       <IntegrityCard />
       <HelpCard />
     </div>
+  )
+}
+
+// --- Modo demo --------------------------------------------------------------------
+// Datos de ejemplo para enseñar la app sin mostrar los reales. No toca la base de
+// datos y dura solo la pestaña.
+function DemoCard() {
+  const demo = useDemoMode()
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-semibold text-slate-900">Modo demo</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Muestra datos de ejemplo para enseñar la app sin que se vean los tuyos. Nada se lee ni
+            se guarda en tu base de datos, y se desactiva al cerrar la pestaña.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={demo}
+          aria-label="Modo demo"
+          onClick={() => (demo ? exitDemo() : enterDemo())}
+          className={cn(
+            'relative h-7 w-12 shrink-0 rounded-full transition',
+            demo ? 'bg-amber-500' : 'bg-slate-200',
+          )}
+        >
+          <span
+            className={cn(
+              'absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform',
+              demo && 'translate-x-5',
+            )}
+          />
+        </button>
+      </div>
+      {demo && (
+        <p className="mt-3 text-xs text-slate-500">
+          Activado: puedes crear, anular y editar movimientos de ejemplo; el resto de cambios no
+          está disponible. Al salir se descartan.
+        </p>
+      )}
+    </Card>
   )
 }
 

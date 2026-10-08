@@ -1,7 +1,6 @@
 import { lazy, Suspense } from 'react'
-import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { queryClient } from '@/lib/queryClient'
+import { DemoQueryProvider } from '@/lib/demo/DemoQueryProvider'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { CryptoProvider } from '@/features/crypto/CryptoProvider'
 import { VaultGate } from '@/features/crypto/VaultGate'
@@ -39,7 +38,7 @@ const ConfigPage = lazy(() =>
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <DemoQueryProvider>
       <AuthProvider>
         <CryptoProvider>
           <BrowserRouter>
@@ -67,6 +66,6 @@ export default function App() {
           </BrowserRouter>
         </CryptoProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </DemoQueryProvider>
   )
 }

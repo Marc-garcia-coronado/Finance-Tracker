@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from '@/components/Modal'
 import { MicIcon } from '@/components/icons'
 import { useOnline } from '@/lib/useOnline'
+import { useDemoMode } from '@/lib/demo/demoMode'
 import { useVoiceEnabled } from '@/lib/voiceSettings'
 import { MovementForm } from './MovementForm'
 import { VoiceDialog } from './voz/VoiceDialog'
@@ -11,12 +12,13 @@ import { VoiceDialog } from './voz/VoiceDialog'
 export function NewMovementDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const voiceEnabled = useVoiceEnabled()
   const online = useOnline()
+  const demo = useDemoMode() // el dictado llama a un servicio real: fuera en la demo
   const [voiceOpen, setVoiceOpen] = useState(false)
 
   return (
     <>
       <Modal open={open} onClose={onClose} title="Nuevo movimiento">
-        {voiceEnabled && online && (
+        {voiceEnabled && online && !demo && (
           <>
             <button
               type="button"

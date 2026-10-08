@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { generatePendingRecurring } from '@/lib/recurring'
 import { todayISO } from '@/lib/dates'
 import { qk } from '@/lib/queries'
+import { isDemoMode } from '@/lib/demo/demoMode'
 
 export type AutoRecurringState =
   | { status: 'idle' | 'running' }
@@ -23,6 +24,8 @@ export function useAutoRecurring(): AutoRecurringState {
     // Sin conexión no se puede escribir: se genera en la próxima apertura con red
     // (no se marca como ejecutado), sin enseñar un error que ya explica el banner.
     if (navigator.onLine === false) return
+    // En modo demo no se escribe nada real.
+    if (isDemoMode()) return
     let cancelled = false
     setState({ status: 'running' })
     run ??= generatePendingRecurring(todayISO())

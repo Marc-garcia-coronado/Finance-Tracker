@@ -15,3 +15,18 @@ export const queryClient = new QueryClient({
     },
   },
 })
+
+// Caché del modo demo: solo memoria, separada de la real. Nunca se persiste
+// (la caché offline cifrada solo escucha al `queryClient` real) y se vacía al
+// entrar y salir del modo demo.
+export const demoQueryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: Infinity,
+      retry: false,
+      refetchOnWindowFocus: false,
+      networkMode: 'always',
+    },
+    mutations: { networkMode: 'always' },
+  },
+})
