@@ -14,6 +14,7 @@ import {
 import { useMonthlyTotals } from '@/lib/queries'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { BudgetCard } from './BudgetCard'
+import { TrendsCard } from './TrendsCard'
 import { showTour } from '@/features/onboarding/tourStorage'
 
 export function MensualPage() {
@@ -78,6 +79,8 @@ export function MensualPage() {
             <CategoryTable title="Ingresos por categoría" rows={ingresos} totalCents={consumo.incomeCents} />
             <CategoryTable title="Gastos por categoría" rows={gastos} totalCents={consumo.expenseCents} />
           </div>
+
+          <TrendsCard totals={data} month={month} />
 
           <Card className="p-4">
             <p className="mb-3 text-sm font-medium text-slate-700">Acumulado del año {year}</p>

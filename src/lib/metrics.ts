@@ -250,3 +250,134 @@ export function monthsToTarget(
   if (monthlyCents <= 0) return null // ritmo 0 => inalcanzable
   return Math.ceil(remainingCents / monthlyCents)
 }
+
+// ---------------------------------------------------------------------------
+// Tendencias de gasto por categoría
+// ---------------------------------------------------------------------------
+
+// Desplaza un 'YYYY-MM' en `delta` meses (negativo = hacia atrás).
+export function shiftMonth(m: string, delta: number): string {
+  const [y, mo] = m.split('-').map(Number) as [number, number]
+  const idx = y * 12 + (mo - 1) + delta
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`
+}
+
+// Gasto por (mes, cuenta) de las cuentas expense.
+function expenseByMonthAccount(totals: MonthlyTotal[]): Map<string, number> {
+  const map = new Map<string, number>()
+  for (const t of totals) {
+    if (t.type !== 'expense') continue
+    const k = `${t.month}|${t.account_id}`
+    map.set(k, (map.get(k) ?? 0) + t.total_cents)
+  }
+  return map
+}
+
+// Variación relativa (0,35 = +35 %). null si no hay base con la que comparar.
+function relativeChange(current: number, base: number): number | null {
+  return base > 0 ? (current - base) / base : null
+}
+
+export type CategoryTrend = {
+  accountId: string
+  name: string
+  cents: number // gasto del mes
+  prevCents: number // gasto del mes anterior
+  vsPrev: number | null // variación frente al mes anterior
+  avgCents: number | null // media de los meses previos (hasta `window`), null si no hay
+  vsAvg: number | null // variación frente a esa media
+}
+
+// Compara el gasto de cada categoría en `month` con el mes anterior y con la
+// media de los hasta `window` meses anteriores. La media solo cuenta los meses
+// desde el primero con datos en `totals` (los meses previos al uso de la app no
+// son "meses sin gasto"). Solo salen las categorías con gasto en `month`.
+export function expenseTrends(
+  totals: MonthlyTotal[],
+  month: string,
+  window = 12,
+): CategoryTrend[] {
+  const byKey = expenseByMonthAccount(totals)
+  const first = totals.reduce<string | null>(
+    (min, t) => (min === null || t.month < min ? t.month : min),
+    null,
+  )
+  const prevMonths: string[] = []
+  for (let i = 1; i <= window; i++) {
+    const m = shiftMonth(month, -i)
+    if (first === null || m < first) break
+    prevMonths.push(m)
+  }
+  const prev = shiftMonth(month, -1)
+
+  const names = new Map<string, string>()
+  for (const t of totals) if (t.type === 'expense') names.set(t.account_id, t.name)
+
+  const rows: CategoryTrend[] = []
+  for (const [accountId, name] of names) {
+    const cents = byKey.get(`${month}|${accountId}`) ?? 0
+    if (cents === 0) continue
+    const prevCents = byKey.get(`${prev}|${accountId}`) ?? 0
+    const avgCents =
+      prevMonths.length > 0
+        ? Math.round(
+            prevMonths.reduce((s, m) => s + (byKey.get(`${m}|${accountId}`) ?? 0), 0) /
+              prevMonths.length,
+          )
+        : null
+    rows.push({
+      accountId,
+      name,
+      cents,
+      prevCents,
+      vsPrev: relativeChange(cents, prevCents),
+      avgCents,
+      vsAvg: avgCents === null ? null : relativeChange(cents, avgCents),
+    })
+  }
+  return rows.sort((a, b) => b.cents - a.cents)
+}
+
+export const OTHERS_ID = '__others__'
+
+export type ExpenseSeries = {
+  months: string[] // 'YYYY-MM', del más antiguo a `endMonth`
+  categories: { accountId: string; name: string; values: number[] }[]
+}
+
+// Gasto mensual por categoría en los `count` meses que acaban en `endMonth`.
+// Se quedan las `top` categorías con más gasto en la ventana; el resto se
+// agrupa en «Otras» (al final, solo si tiene importe).
+export function expenseSeries(
+  totals: MonthlyTotal[],
+  endMonth: string,
+  count = 12,
+  top = 5,
+): ExpenseSeries {
+  const byKey = expenseByMonthAccount(totals)
+  const months = Array.from({ length: count }, (_, i) => shiftMonth(endMonth, i - (count - 1)))
+
+  const all = new Map<string, { name: string; values: number[] }>()
+  for (const t of totals) {
+    if (t.type !== 'expense' || !months.includes(t.month) || all.has(t.account_id)) continue
+    all.set(t.account_id, {
+      name: t.name,
+      values: months.map((m) => byKey.get(`${m}|${t.account_id}`) ?? 0),
+    })
+  }
+  const sum = (v: number[]) => v.reduce((s, x) => s + x, 0)
+  const ranked = [...all.entries()]
+    .filter(([, c]) => sum(c.values) !== 0)
+    .sort((a, b) => sum(b[1].values) - sum(a[1].values))
+
+  const categories = ranked.slice(0, top).map(([accountId, c]) => ({ accountId, ...c }))
+  const rest = ranked.slice(top)
+  if (rest.length > 0) {
+    categories.push({
+      accountId: OTHERS_ID,
+      name: 'Otras',
+      values: months.map((_, i) => rest.reduce((s, [, c]) => s + c.values[i]!, 0)),
+    })
+  }
+  return { months, categories }
+}
