@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  accountIdsWithMovements,
   balancesFromLedger,
   monthlyTotalsFromLedger,
   netWorthFromLedger,
@@ -73,5 +74,14 @@ describe('netWorthFromLedger', () => {
       { month: '2026-02', cents: 202000 },
       { month: '2026-03', cents: 202000 },
     ])
+  })
+})
+
+describe('accountIdsWithMovements', () => {
+  it('incluye las cuentas con líneas y excluye las vacías', () => {
+    const ids = accountIdsWithMovements(ledger)
+    expect(ids.has('cc')).toBe(true)
+    expect(ids.has('ocio')).toBe(true)
+    expect(ids.has('vacia')).toBe(false)
   })
 })

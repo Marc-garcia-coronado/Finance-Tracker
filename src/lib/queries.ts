@@ -20,6 +20,7 @@ import { decryptCents, decryptString, encryptCents, encryptString } from './cryp
 import type { Enums, Tables } from './database.types'
 import type { MonthlyTotalRow, NetWorthPoint } from './metrics'
 import {
+  accountIdsWithMovements,
   balancesFromLedger,
   monthlyTotalsFromLedger,
   netWorthFromLedger,
@@ -262,6 +263,11 @@ export function useRecurring(): UseQueryResult<Recurring[]> {
 // así que solo se recalculan cuando cambia el ledger.
 export function useBalances(): UseQueryResult<Balance[]> {
   return useQuery({ ...ledgerQuery, select: balancesFromLedger })
+}
+
+// Cuentas con movimientos (su tipo no se puede cambiar).
+export function useAccountIdsWithMovements(): UseQueryResult<Set<string>> {
+  return useQuery({ ...ledgerQuery, select: accountIdsWithMovements })
 }
 
 export function useMonthlyTotals(): UseQueryResult<MonthlyTotal[]> {

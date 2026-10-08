@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { formatEuro, tryEuroToCents } from '@/lib/money'
 import { formatDate } from '@/lib/dates'
 import {
+  useAccountIdsWithMovements,
   useAccounts,
   useAllocations,
   useArchiveAccount,
@@ -327,6 +328,9 @@ function AccountsCard({ accounts }: { accounts: Account[] }) {
 
 function AccountForm({ account, onDone }: { account: Account | null; onDone: () => void }) {
   const save = useSaveAccount()
+  const withMovements = useAccountIdsWithMovements()
+  // Mientras carga el ledger (o si falla) se bloquea por seguridad.
+  const typeLocked = !!account && (withMovements.data?.has(account.id) ?? true)
   const [name, setName] = useState(account?.name ?? '')
   const [type, setType] = useState<Enums<'account_type'>>(account?.type ?? 'expense')
   const [bucket, setBucket] = useState(account?.is_budget_bucket ?? false)
@@ -357,10 +361,21 @@ function AccountForm({ account, onDone }: { account: Account | null; onDone: () 
       <Field label="Nombre" htmlFor="acc-name">
         <Input id="acc-name" value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <Field label="Tipo" htmlFor="acc-type" hint="No cambies el tipo si la cuenta ya tiene movimientos.">
+      <Field
+        label="Tipo"
+        htmlFor="acc-type"
+        hint={
+          typeLocked
+            ? withMovements.isPending
+              ? 'Comprobando si la cuenta tiene movimientos…'
+              : 'No se puede cambiar el tipo: la cuenta ya tiene movimientos.'
+            : undefined
+        }
+      >
         <Select
           id="acc-type"
           value={type}
+          disabled={typeLocked}
           onChange={(e) => setType(e.target.value as Enums<'account_type'>)}
         >
           <option value="asset">Cuenta (activo)</option>
