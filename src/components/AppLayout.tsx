@@ -35,10 +35,10 @@ const PRIMARY: NavItem[] = [
   { to: '/', label: 'Inicio', icon: HomeIcon, end: true },
   { to: '/movimientos', label: 'Movim.', icon: ArrowsRightLeftIcon },
   { to: '/mensual', label: 'Mensual', icon: CalendarIcon },
-  { to: '/patrimonio', label: 'Patrimonio', icon: ChartBarIcon },
 ]
 
 const MORE: (NavItem & { description: string })[] = [
+  { to: '/patrimonio', label: 'Patrimonio', description: 'Cuentas, saldos y evolución', icon: ChartBarIcon },
   { to: '/recurrentes', label: 'Recurrentes', description: 'Pagos e ingresos fijos', icon: RepeatIcon },
   { to: '/objetivos', label: 'Objetivos', description: 'Metas de ahorro', icon: TargetIcon },
   { to: '/config', label: 'Configuración', description: 'Ingreso, cuentas y asignación', icon: SettingsIcon },
@@ -139,7 +139,7 @@ export function AppLayout() {
         end={item.end}
         className={({ isActive }) =>
           cn(
-            'flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
+            'flex min-w-0 flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
             isActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
           )
         }
@@ -218,7 +218,7 @@ export function AppLayout() {
         aria-label="Secciones"
         className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/70 bg-white/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42_/_0.12)] backdrop-blur-lg md:hidden"
       >
-        <div className="mx-auto grid max-w-md grid-cols-6">
+        <div className="mx-auto grid max-w-md grid-cols-5">
           {PRIMARY.slice(0, 2).map((item) => renderTab(item))}
           <button
             onClick={() => setQuickOpen(true)}
@@ -236,7 +236,7 @@ export function AppLayout() {
             aria-haspopup="dialog"
             aria-expanded={moreOpen}
             className={cn(
-              'flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
+              'flex min-w-0 flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
               moreActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
             )}
           >
