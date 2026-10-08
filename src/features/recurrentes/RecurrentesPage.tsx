@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { PageHeader } from '@/components/PageHeader'
 import { Button, Card, Field, Input, Select } from '@/components/ui'
 import { Modal } from '@/components/Modal'
+import { useConfirm } from '@/components/confirmContext'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { cn } from '@/lib/cn'
@@ -28,6 +29,7 @@ export function RecurrentesPage() {
   const recurring = useRecurring()
   const accounts = useAccounts()
   const del = useDeleteRecurring()
+  const confirmDialog = useConfirm()
   const generate = useGenerateRecurring()
 
   const [open, setOpen] = useState(false)
@@ -54,7 +56,13 @@ export function RecurrentesPage() {
     }
   }
   async function onDelete(r: Recurring) {
-    if (!confirm(`¿Eliminar la plantilla "${r.description}"?`)) return
+    const ok = await confirmDialog({
+      title: 'Eliminar plantilla',
+      message: `¿Eliminar la plantilla "${r.description}"?`,
+      confirmLabel: 'Eliminar',
+      destructive: true,
+    })
+    if (!ok) return
     await del.mutateAsync(r.id)
   }
 
