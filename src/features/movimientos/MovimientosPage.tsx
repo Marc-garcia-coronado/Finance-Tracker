@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
-import { Button, Card, Input, Select } from '@/components/ui'
-import { DownloadIcon, SearchIcon } from '@/components/icons'
+import { Button, Card, Input, Select, Spinner } from '@/components/ui'
+import { DownloadIcon, EllipsisIcon, PencilIcon, SearchIcon, UndoIcon } from '@/components/icons'
 import { matchesSearch } from '@/lib/search'
 import { isEditableKind } from '@/lib/entryForm'
 import { entriesToCsv } from '@/lib/exportMovements'
@@ -28,6 +28,8 @@ import { ImportMovementsModal } from './ImportMovementsModal'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { showTour } from '@/features/onboarding/tourStorage'
 
+const EXPORT_HINT =
+  'Exporta a CSV los movimientos que coinciden con los filtros (sin anulados). Los ajustes no se pueden reimportar.'
 const PAGE_SIZE = 20
 const MONTHS = recentMonths(12)
 
@@ -64,6 +66,7 @@ export function MovimientosPage() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<EntryWithLines | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   const [month, setMonth] = useState<string>(MONTHS[0]!)
   const [kind, setKind] = useState<EntryFilters['kind']>('all')
   const [accountId, setAccountId] = useState<string>('all')
@@ -142,17 +145,31 @@ export function MovimientosPage() {
         onHelp={() => showTour('movimientos')}
         action={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => setImportOpen(true)}>
+            <Button
+              variant="secondary"
+              className="hidden sm:inline-flex"
+              onClick={() => setImportOpen(true)}
+            >
               Importar
             </Button>
             <Button
               variant="secondary"
+              className="hidden sm:inline-flex"
               onClick={onExport}
               loading={exporting}
-              title="Exporta a CSV los movimientos que coinciden con los filtros (sin anulados). Los ajustes no se pueden reimportar."
+              title={EXPORT_HINT}
             >
               {!exporting && <DownloadIcon className="h-4 w-4" />}
               Exportar
+            </Button>
+            <Button
+              variant="secondary"
+              className="px-3 sm:hidden"
+              aria-label="Más acciones"
+              aria-haspopup="dialog"
+              onClick={() => setActionsOpen(true)}
+            >
+              <EllipsisIcon className="h-5 w-5" />
             </Button>
             <Button onClick={() => setOpen(true)}>Nuevo</Button>
           </div>
@@ -187,11 +204,11 @@ export function MovimientosPage() {
         )}
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
+        <label className="flex min-w-0 flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:gap-2">
           Mes
           <Select
-            className="w-auto"
+            className="w-full sm:w-auto"
             value={month}
             onChange={(e) => resetPageAnd(() => setMonth(e.target.value))}
           >
@@ -203,10 +220,10 @@ export function MovimientosPage() {
             ))}
           </Select>
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="flex min-w-0 flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:gap-2">
           Tipo
           <Select
-            className="w-auto"
+            className="w-full sm:w-auto"
             value={kind}
             onChange={(e) =>
               resetPageAnd(() => setKind(e.target.value as EntryFilters['kind']))
@@ -219,10 +236,10 @@ export function MovimientosPage() {
             <option value="adjustment">Ajuste</option>
           </Select>
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="col-span-2 flex min-w-0 flex-col gap-1 text-sm text-slate-600 sm:col-auto sm:flex-row sm:items-center sm:gap-2">
           Cuenta
           <Select
-            className="w-auto max-w-[14rem]"
+            className="w-full sm:w-auto sm:max-w-[14rem]"
             value={accountId}
             onChange={(e) => resetPageAnd(() => setAccountId(e.target.value))}
           >
@@ -245,7 +262,7 @@ export function MovimientosPage() {
             })}
           </Select>
         </label>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 sm:col-auto">
           <input
             type="checkbox"
             className="h-4 w-4 rounded border-slate-300 text-indigo-600"
@@ -288,12 +305,12 @@ export function MovimientosPage() {
             ))}
           </Card>
 
-          <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-            <span>
+          <div className="mt-4 flex flex-col gap-2 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <span className="min-w-0 break-words">
               {count} movimiento(s){searching ? ` que coinciden con «${search}»` : ''} · página {page + 1}{' '}
               de {totalPages}
             </span>
-            <div className="flex gap-2">
+            <div className="flex gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
               <Button
                 variant="secondary"
                 disabled={page === 0}
@@ -319,6 +336,35 @@ export function MovimientosPage() {
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="Editar movimiento">
         {editing && <MovementForm key={editing.id} entry={editing} onDone={() => setEditing(null)} />}
+      </Modal>
+
+      <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title="Más acciones">
+        <div className="space-y-1">
+          <button
+            onClick={() => {
+              setActionsOpen(false)
+              setImportOpen(true)
+            }}
+            className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition hover:bg-slate-50"
+          >
+            <span className="font-medium text-slate-800">Importar</span>
+            <span className="text-xs text-slate-500">Carga movimientos desde un archivo CSV.</span>
+          </button>
+          <button
+            onClick={async () => {
+              await onExport()
+              setActionsOpen(false)
+            }}
+            disabled={exporting}
+            className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition hover:bg-slate-50 disabled:opacity-50"
+          >
+            <span className="flex items-center gap-2 font-medium text-slate-800">
+              {exporting ? <Spinner className="h-4 w-4" /> : <DownloadIcon className="h-4 w-4" />}
+              Exportar CSV
+            </span>
+            <span className="text-xs text-slate-500">{EXPORT_HINT}</span>
+          </button>
+        </div>
       </Modal>
 
       <ImportMovementsModal open={importOpen} onClose={() => setImportOpen(false)} />
@@ -352,9 +398,9 @@ function Row({
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className={cn('badge', KIND_BADGE[entry.kind])}>{KIND_TEXT[entry.kind]}</span>
-          {isAnnulment && <span className="badge bg-slate-100 text-slate-500">Anulación</span>}
-          {isAnnulled && <span className="badge bg-amber-50 text-amber-700">Anulado</span>}
+          <span className={cn('badge shrink-0', KIND_BADGE[entry.kind])}>{KIND_TEXT[entry.kind]}</span>
+          {isAnnulment && <span className="badge shrink-0 bg-slate-100 text-slate-500">Anulación</span>}
+          {isAnnulled && <span className="badge shrink-0 bg-amber-50 text-amber-700">Anulado</span>}
           <span className="truncate font-medium text-slate-800">
             {entry.description || '(sin concepto)'}
           </span>
@@ -376,17 +422,21 @@ function Row({
             <button
               onClick={() => onEdit(entry)}
               disabled={busy}
-              className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 disabled:opacity-50"
+              aria-label="Editar movimiento"
+              title="Editar movimiento"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50"
             >
-              Editar
+              <PencilIcon className="h-4 w-4" />
             </button>
           )}
           <button
             onClick={() => onVoid(entry.id)}
             disabled={busy}
-            className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
+            aria-label="Anular movimiento"
+            title="Anular movimiento"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50"
           >
-            Anular
+            <UndoIcon className="h-4 w-4" />
           </button>
         </div>
       )}

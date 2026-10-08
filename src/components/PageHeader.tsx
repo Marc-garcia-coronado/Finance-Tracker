@@ -13,8 +13,8 @@ export function PageHeader({
   onHelp?: () => void
 }) {
   return (
-    <div className="mb-5 flex items-end justify-between gap-3">
-      <div>
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="min-w-0">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
           {onHelp && (
