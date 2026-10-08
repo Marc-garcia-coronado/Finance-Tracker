@@ -8,7 +8,7 @@ import { lastDataUpdate } from '@/lib/offlineCache'
 import { useOnline } from '@/lib/useOnline'
 import { cn } from '@/lib/cn'
 import { Modal } from './Modal'
-import { MovementForm } from '@/features/movimientos/MovementForm'
+import { NewMovementDialog } from '@/features/movimientos/NewMovementDialog'
 import { OnboardingTour } from '@/features/onboarding/OnboardingTour'
 import {
   ArrowsRightLeftIcon,
@@ -303,9 +303,7 @@ export function AppLayout() {
         </div>
       </Modal>
 
-      <Modal open={quickOpen} onClose={() => setQuickOpen(false)} title="Nuevo movimiento">
-        <MovementForm onDone={() => setQuickOpen(false)} />
-      </Modal>
+      <NewMovementDialog open={quickOpen} onClose={() => setQuickOpen(false)} />
 
       <OnboardingTour />
     </div>

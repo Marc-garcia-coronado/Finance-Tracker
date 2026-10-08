@@ -205,3 +205,20 @@ export function LockIcon(props: IconProps) {
     </Base>
   )
 }
+
+export function MicIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <rect x="9" y="3" width="6" height="12" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+    </Base>
+  )
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="m5 12 5 5 9-10" />
+    </Base>
+  )
+}

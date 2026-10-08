@@ -13,6 +13,9 @@ Se aplican las **reglas transversales del README** sin excepción:
   ledger es append-only: se anula y se recrea, nunca se edita ni se borra.
 - Datos sensibles cifrados en cliente (`src/lib/crypto/`). El servidor no ve
   importes ni descripciones: los agregados se calculan en el cliente.
+- **Única excepción al cifrado**: el dictado con IA (opcional) envía en claro el
+  texto dictado y los nombres de categorías a la Edge Function `parse-movements` y
+  a Anthropic. No se guarda ni se registra nada; no ampliar esta excepción.
 - UI en español, con estados de carga / error / vacío. TypeScript estricto, sin `any`.
 - **Diseño mobile first**: importa más el diseño en móvil que en desktop. Se
   diseña y valida primero a 320–390px; en desktop también debe verse impecable.
