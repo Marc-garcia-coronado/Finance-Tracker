@@ -177,6 +177,20 @@ café») y revisarlos antes de guardarlos (editar / aprobar / eliminar cada uno)
 4. Coste: cada dictado son unos cientos de tokens de Haiku (fracciones de céntimo).
    Las Edge Functions entran en el plan gratuito de Supabase (con cuota mensual).
 
+## Modo demo
+
+Configuración → **Modo demo** muestra datos de ejemplo (cuentas, ~12 meses de
+movimientos, objetivos, recurrentes) para enseñar la app sin que se vean los
+tuyos. Un aviso fijo lo recuerda en todas las páginas, con botón **Salir**.
+
+- Los datos se generan en el cliente (`src/lib/demo/`) y viven solo en memoria:
+  **no se lee ni se escribe nada en Supabase** y no pasan por la caché offline.
+- Se pueden crear, anular y editar movimientos de ejemplo; el resto de cambios
+  (cuentas, objetivos, recurrentes, importar…) responde «No disponible en el modo demo».
+- Dura solo la pestaña (`sessionStorage`) y se desactiva al cerrar sesión.
+- Los hooks de `src/lib/queries.ts` pasan por dos wrappers (`useQuery` / `useMutation`)
+  que desvían al almacén demo; los componentes no lo saben.
+
 ## Estructura
 
 ```

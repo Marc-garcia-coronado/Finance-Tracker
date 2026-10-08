@@ -1,8 +1,10 @@
 import { useCallback } from 'react'
 import {
-  useMutation,
-  useQuery,
+  useMutation as useRealMutation,
+  useQuery as useRealQuery,
   useQueryClient,
+  type UseMutationOptions,
+  type UseQueryOptions,
   type UseQueryResult,
 } from '@tanstack/react-query'
 import { supabase } from './supabase'
@@ -15,6 +17,15 @@ import {
   type CreateEntryParams,
 } from './entries'
 import { generateRecurringForMonth } from './recurring'
+import { DemoModeError, isDemoMode, useDemoMode } from './demo/demoMode'
+import {
+  demoAllEntries,
+  demoCreateEntry,
+  demoRead,
+  demoReplaceEntry,
+  demoVoidEntry,
+  getDemoData,
+} from './demo/demoStore'
 import { monthRange, todayISO } from './dates'
 import { requireSessionKey } from './crypto/session'
 import { decryptCents, decryptString, encryptCents, encryptString } from './crypto/webcrypto'
@@ -78,6 +89,41 @@ export type EntryWithLines = {
   voids_entry_id: string | null
   created_at: string
   entry_lines: { account_id: string; amount_cents: number }[]
+}
+
+// ---------------------------------------------------------------------------
+// Modo demo: todos los hooks de este fichero pasan por estos dos wrappers. Con el
+// modo activo, las lecturas salen del almacén en memoria (demoStore) y las
+// escrituras no llegan a Supabase: o se aplican en memoria (movimientos) o se
+// rechazan con DemoModeError. Los componentes no saben nada del modo demo.
+// ---------------------------------------------------------------------------
+function useQuery<TQueryFnData, TData = TQueryFnData>(
+  options: UseQueryOptions<TQueryFnData, Error, TData, readonly unknown[]>,
+): UseQueryResult<TData, Error> {
+  const demo = useDemoMode()
+  return useRealQuery(
+    demo
+      ? { ...options, queryFn: () => demoRead(options.queryKey) as Promise<TQueryFnData> }
+      : options,
+  )
+}
+
+function useMutation<TData = unknown, TVariables = void>(
+  options: UseMutationOptions<TData, Error, TVariables>,
+  demoFn?: (variables: TVariables) => TData | Promise<TData>,
+) {
+  const demo = useDemoMode()
+  return useRealMutation<TData, Error, TVariables>(
+    demo
+      ? {
+          ...options,
+          mutationFn: async (variables) => {
+            if (!demoFn) throw new DemoModeError()
+            return demoFn(variables)
+          },
+        }
+      : options,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +427,7 @@ export function useEntriesForSearch(
 
 // Todos los movimientos que cumplen los filtros, descifrados (búsqueda y exportación).
 export async function fetchAllEntries(filters: EntryQueryFilters): Promise<EntryWithLines[]> {
+  if (isDemoMode()) return demoAllEntries(filters)
   const data = await fetchAll((from, to) => entriesQuery(filters).range(from, to))
   const key = requireSessionKey()
   return Promise.all(data.map((e) => decryptEntryRow(key, e)))
@@ -391,26 +438,35 @@ export async function fetchAllEntries(filters: EntryQueryFilters): Promise<Entry
 // ---------------------------------------------------------------------------
 export function useCreateEntry() {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (params: CreateEntryParams) => createEntry(params),
-    onSuccess: () => invalidateLedger(qc),
-  })
+  return useMutation(
+    {
+      mutationFn: (params: CreateEntryParams) => createEntry(params),
+      onSuccess: () => invalidateLedger(qc),
+    },
+    demoCreateEntry,
+  )
 }
 
 export function useVoidEntry() {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: string) => voidEntry(id),
-    onSuccess: () => invalidateLedger(qc),
-  })
+  return useMutation(
+    {
+      mutationFn: (id: string) => voidEntry(id),
+      onSuccess: () => invalidateLedger(qc),
+    },
+    demoVoidEntry,
+  )
 }
 
 export function useReplaceEntry() {
   const qc = useQueryClient()
-  return useMutation({
-    mutationFn: ({ id, params }: { id: string; params: CreateEntryParams }) => replaceEntry(id, params),
-    onSuccess: () => invalidateLedger(qc),
-  })
+  return useMutation(
+    {
+      mutationFn: ({ id, params }: { id: string; params: CreateEntryParams }) => replaceEntry(id, params),
+      onSuccess: () => invalidateLedger(qc),
+    },
+    ({ id, params }) => demoReplaceEntry(id, params),
+  )
 }
 
 export type ImportResult = {
@@ -562,7 +618,10 @@ async function runIntegrityCheck(key: CryptoKey): Promise<IntegrityResult> {
 }
 
 export function useCheckIntegrity() {
-  return useMutation({ mutationFn: () => runIntegrityCheck(requireSessionKey()) })
+  return useMutation(
+    { mutationFn: () => runIntegrityCheck(requireSessionKey()) },
+    (): IntegrityResult => ({ checkedEntries: getDemoData().entries.length, problems: [] }),
+  )
 }
 
 export function useGenerateRecurring() {
