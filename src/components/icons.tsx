@@ -29,6 +29,14 @@ export function HomeIcon(props: IconProps) {
   )
 }
 
+export function PlusIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 5v14M5 12h14" />
+    </Base>
+  )
+}
+
 export function SearchIcon(props: IconProps) {
   return (
     <Base {...props}>
