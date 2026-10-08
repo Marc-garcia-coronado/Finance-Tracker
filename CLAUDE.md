@@ -14,6 +14,8 @@ Se aplican las **reglas transversales del README** sin excepción:
 - Datos sensibles cifrados en cliente (`src/lib/crypto/`). El servidor no ve
   importes ni descripciones: los agregados se calculan en el cliente.
 - UI en español, con estados de carga / error / vacío. TypeScript estricto, sin `any`.
+- **Diseño mobile first**: importa más el diseño en móvil que en desktop. Se
+  diseña y valida primero a 320–390px; en desktop también debe verse impecable.
 
 ## Modelos
 
