@@ -77,6 +77,11 @@ Requisitos: Node 18+ y un proyecto de Supabase.
 4. **Solo la anon key** en el cliente. La service_role key jamás en el repo.
 5. UI en español, con estados de carga / error / vacío y accesibilidad.
 6. Tipado estricto contra los tipos generados de Supabase. Sin `any`.
+7. **Excepción documentada: el dictado con IA** (opcional, desactivado por
+   defecto). El texto dictado y los nombres de las categorías viajan **sin
+   cifrar** a una Edge Function y a Anthropic mientras se interpretan. No se
+   almacenan ni se registran; en la base de datos sigue sin haber nada que no
+   esté cifrado. Ver [Dictado por voz con IA](#dictado-por-voz-con-ia).
 
 ## Despliegue gratuito del frontend
 
@@ -139,10 +144,44 @@ psql "$SUPABASE_DB_URL" -f backup.sql
 > cifrados con tu clave maestra: para leerlos en la app hace falta tu contraseña
 > o el código de recuperación, además de `BACKUP_PASSPHRASE`.
 
+## Dictado por voz con IA
+
+Permite dictar uno o varios movimientos («ayer 12 euros en el súper y hoy 3,50 de
+café») y revisarlos antes de guardarlos (editar / aprobar / eliminar cada uno).
+
+- **Voz → texto:** Web Speech API del navegador (`es-ES`). Nuestro backend no
+  recibe audio. Si el navegador no la soporta, se puede escribir la frase.
+- **Texto → movimientos:** Edge Function
+  [`supabase/functions/parse-movements`](./supabase/functions/parse-movements/index.ts),
+  que llama a Claude Haiku 5.5 con salida estructurada. Recibe solo el texto y los
+  **nombres** de las categorías (con claves opacas, nunca ids reales). Exige sesión
+  y limita a 50 dictados por usuario y día (`ai_usage`, solo un contador).
+- **Privacidad:** es la única excepción al cifrado de extremo a extremo (regla 7).
+  La función no guarda ni registra el contenido. Cada movimiento se cifra y se
+  guarda con `createEntry` solo cuando lo apruebas.
+- **Activación:** Configuración → «Dictado con IA» (por dispositivo, apagado por
+  defecto, con aviso la primera vez).
+
+### Puesta en marcha
+
+1. Aplica `migrations/005_ai_usage.sql` en el SQL Editor (haz backup antes).
+2. Crea una API key en la consola de Anthropic y **pon un límite mensual de gasto**.
+3. Con la [CLI de Supabase](https://supabase.com/docs/guides/cli) enlazada al proyecto:
+
+   ```bash
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   supabase functions deploy parse-movements
+   ```
+
+   La key vive solo en los secrets de Supabase; nunca en el repo ni en el cliente.
+4. Coste: cada dictado son unos cientos de tokens de Haiku (fracciones de céntimo).
+   Las Edge Functions entran en el plan gratuito de Supabase (con cuota mensual).
+
 ## Estructura
 
 ```
 schema.sql                 Esquema de partida doble (aplicar en Supabase)
+supabase/functions/        Edge Functions (parse-movements: dictado con IA)
 src/
   lib/                     supabase client, money, dates, entries, recurring,
                            metrics, queries (react-query), database.types

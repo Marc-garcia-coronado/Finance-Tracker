@@ -20,6 +20,7 @@ import {
 } from '@/lib/queries'
 import type { Enums } from '@/lib/database.types'
 import { childrenOf, orderWithChildren, parentOptions } from '@/lib/accountTree'
+import { setVoiceEnabled, useVoiceEnabled } from '@/lib/voiceSettings'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { showOnboarding, showTour } from '@/features/onboarding/tourStorage'
 
@@ -44,9 +45,83 @@ export function ConfigPage() {
         incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
       />
       <AccountsCard accounts={accounts.data ?? []} />
+      <VoiceCard />
       <IntegrityCard />
       <HelpCard />
     </div>
+  )
+}
+
+// --- Dictado con IA -------------------------------------------------------------
+// Preferencia por dispositivo, desactivada por defecto. Al activarla se explica
+// qué datos salen del dispositivo (única excepción al cifrado de extremo a extremo).
+function VoiceCard() {
+  const enabled = useVoiceEnabled()
+  const [confirming, setConfirming] = useState(false)
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-semibold text-slate-900">Dictado con IA</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Dicta uno o varios movimientos y revísalos antes de guardarlos. Se activa por
+            dispositivo.
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={enabled}
+          aria-label="Dictado con IA"
+          onClick={() => {
+            if (enabled) setVoiceEnabled(false)
+            else setConfirming(true)
+          }}
+          className={cn(
+            'relative h-7 w-12 shrink-0 rounded-full transition',
+            enabled ? 'bg-indigo-600' : 'bg-slate-200',
+          )}
+        >
+          <span
+            className={cn(
+              'absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform',
+              enabled && 'translate-x-5',
+            )}
+          />
+        </button>
+      </div>
+
+      {confirming && !enabled && (
+        <div className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium">Qué sale de tu dispositivo</p>
+          <p>
+            Al interpretar un dictado, el texto y los nombres de tus categorías viajan{' '}
+            <strong>sin cifrar</strong> a una función de Supabase y a Anthropic, solo durante esa
+            petición. No se guardan ni se registran. Tus movimientos siguen guardándose cifrados.
+          </p>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setConfirming(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                setVoiceEnabled(true)
+                setConfirming(false)
+              }}
+            >
+              Entendido, activar
+            </Button>
+          </div>
+        </div>
+      )}
+      {enabled && (
+        <p className="mt-3 text-xs text-slate-500">
+          Activado. Verás «Dictar con IA» al añadir un movimiento. El texto dictado y los nombres de
+          tus categorías se envían sin cifrar a Anthropic solo mientras se interpreta.
+        </p>
+      )}
+    </Card>
   )
 }
 

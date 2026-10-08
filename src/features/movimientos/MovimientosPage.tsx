@@ -24,6 +24,7 @@ import {
   type EntryQueryFilters,
 } from '@/lib/queries'
 import { MovementForm } from './MovementForm'
+import { NewMovementDialog } from './NewMovementDialog'
 import { ImportMovementsModal } from './ImportMovementsModal'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { showTour } from '@/features/onboarding/tourStorage'
@@ -330,9 +331,7 @@ export function MovimientosPage() {
         </>
       )}
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Nuevo movimiento">
-        <MovementForm onDone={() => setOpen(false)} />
-      </Modal>
+      <NewMovementDialog open={open} onClose={() => setOpen(false)} />
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="Editar movimiento">
         {editing && <MovementForm key={editing.id} entry={editing} onDone={() => setEditing(null)} />}
