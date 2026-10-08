@@ -21,12 +21,12 @@ import type { Enums, Tables } from './database.types'
 import type { MonthlyTotalRow, NetWorthPoint } from './metrics'
 import {
   accountIdsWithMovements,
+  liveLedgerLines,
   balancesFromLedger,
   monthlyTotalsFromLedger,
   netWorthFromLedger,
   type Balance,
   type Ledger,
-  type LedgerLine,
 } from './ledger'
 import { checkIntegrity, type IntegrityEntry, type IntegrityLine, type IntegrityProblem } from './integrity'
 
@@ -128,25 +128,11 @@ async function loadLedger(key: CryptoKey): Promise<Ledger> {
     ),
   ])
 
-  const meta = new Map(entries.map((e) => [e.id, e]))
-  // Descifrado en paralelo: WebCrypto es asíncrono y encadenar un await por
-  // línea desaprovecha la concurrencia.
-  const decrypted = await Promise.all(
-    lines.map(async (l): Promise<LedgerLine | null> => {
-      const e = meta.get(l.entry_id)
-      // Excluye el par completo de una anulación: el movimiento original (marcado
-      // con voided_at) Y su asiento inverso (marcado con voids_entry_id). Contar
-      // solo uno de los dos dejaría un neto espurio (p. ej. una categoría de gasto
-      // en negativo) en balances y totales mensuales.
-      if (!e || e.voided_at || e.voids_entry_id) return null
-      const cents = l.amount_enc != null ? await decryptCents(key, l.amount_enc) : (l.amount_cents ?? 0)
-      return { account_id: l.account_id, kind: e.kind, month: e.occurred_on.slice(0, 7), cents }
-    }),
-  )
+  const liveLines = await liveLedgerLines(entries, lines, (enc) => decryptCents(key, enc))
   const accounts = await Promise.all(
     accountRows.map(async (a) => ({ id: a.id, name: await decryptString(key, a.name), type: a.type })),
   )
-  return { accounts, lines: decrypted.filter((l): l is LedgerLine => l !== null) }
+  return { accounts, lines: liveLines }
 }
 
 const ledgerQuery = {

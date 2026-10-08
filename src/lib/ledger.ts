@@ -18,6 +18,45 @@ export type LedgerLine = {
 
 export type Ledger = { accounts: LedgerAccount[]; lines: LedgerLine[] }
 
+export type EntryRow = {
+  id: string
+  occurred_on: string
+  kind: Enums<'entry_kind'>
+  voided_at: string | null
+  voids_entry_id: string | null
+}
+
+export type EntryLineRow = {
+  entry_id: string
+  account_id: string
+  amount_enc: string | null
+  amount_cents: number | null // legado en claro
+}
+
+// Construye las líneas vigentes del ledger a partir de las filas de la BD.
+// Excluye el par completo de una anulación: el movimiento original (marcado con
+// voided_at) Y su asiento inverso (marcado con voids_entry_id). Contar solo uno
+// de los dos dejaría un neto espurio (p. ej. una categoría de gasto en negativo)
+// en balances y totales mensuales. `decrypt` se inyecta para poder testearlo.
+export async function liveLedgerLines(
+  entries: EntryRow[],
+  lines: EntryLineRow[],
+  decrypt: (enc: string) => Promise<number>,
+): Promise<LedgerLine[]> {
+  const meta = new Map(entries.map((e) => [e.id, e]))
+  // Descifrado en paralelo: WebCrypto es asíncrono y encadenar un await por
+  // línea desaprovecha la concurrencia.
+  const decrypted = await Promise.all(
+    lines.map(async (l): Promise<LedgerLine | null> => {
+      const e = meta.get(l.entry_id)
+      if (!e || e.voided_at || e.voids_entry_id) return null
+      const cents = l.amount_enc != null ? await decrypt(l.amount_enc) : (l.amount_cents ?? 0)
+      return { account_id: l.account_id, kind: e.kind, month: e.occurred_on.slice(0, 7), cents }
+    }),
+  )
+  return decrypted.filter((l): l is LedgerLine => l !== null)
+}
+
 // Ids de las cuentas con alguna línea vigente (no anulada) en el ledger. Su tipo
 // ya no se puede cambiar: reclasificaría de golpe todo su histórico.
 export function accountIdsWithMovements(ledger: Ledger): Set<string> {
