@@ -388,7 +388,8 @@ drop policy if exists own_rows on ai_usage;
 drop policy if exists own_select on ai_usage;
 create policy own_select on ai_usage for select using (user_id = auth.uid());
 
-revoke insert, update, delete on ai_usage from authenticated;
+revoke all on ai_usage from authenticated;
+grant select on ai_usage to authenticated;
 revoke all on ai_usage from anon;
 
 -- Consume 1 uso del día del usuario autenticado. Devuelve true si aún estaba
