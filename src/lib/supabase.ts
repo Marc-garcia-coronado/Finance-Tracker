@@ -12,7 +12,18 @@ if (!url || !anonKey) {
 }
 
 // Solo la anon key vive en el cliente. La service_role key NUNCA entra aquí.
+export const OFFLINE_MESSAGE = 'Sin conexión: la app es de solo lectura hasta que vuelva la red.'
+
+// Sin red falla al instante con un mensaje en español (en vez de «Failed to fetch»).
+const guardedFetch: typeof fetch = (input, init) => {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return Promise.reject(new Error(OFFLINE_MESSAGE))
+  }
+  return fetch(input, init)
+}
+
 export const supabase = createClient<Database>(url, anonKey, {
+  global: { fetch: guardedFetch },
   auth: {
     persistSession: true,
     autoRefreshToken: true,
