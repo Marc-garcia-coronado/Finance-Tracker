@@ -7,6 +7,7 @@ import {
   monthlyConsumo,
   monthsToTarget,
   requiredMonthlyContribution,
+  netWorthChange,
   netWorthSeries,
   savingsRate,
   shiftMonth,
@@ -103,6 +104,24 @@ describe('netWorthSeries', () => {
 
   it('serie vacía si no hay líneas de activo', () => {
     expect(netWorthSeries([], assets, '2026-03')).toEqual([])
+  })
+})
+
+describe('netWorthChange', () => {
+  const p = (...c: number[]) => c.map((cents, i) => ({ month: `2026-0${i + 1}`, cents }))
+
+  it('null con menos de dos puntos', () => {
+    expect(netWorthChange([])).toBeNull()
+    expect(netWorthChange(p(100))).toBeNull()
+  })
+
+  it('subida y bajada frente al mes anterior', () => {
+    expect(netWorthChange(p(100, 150, 200))).toEqual({ cents: 50, ratio: 50 / 150 })
+    expect(netWorthChange(p(200, 150))).toEqual({ cents: -50, ratio: -0.25 })
+  })
+
+  it('ratio null si el mes anterior era 0', () => {
+    expect(netWorthChange(p(0, 100))).toEqual({ cents: 100, ratio: null })
   })
 })
 
