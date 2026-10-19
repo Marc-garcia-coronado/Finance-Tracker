@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button, Card, Input, Select, Spinner } from '@/components/ui'
-import { DownloadIcon, EllipsisIcon, PencilIcon, SearchIcon, UndoIcon } from '@/components/icons'
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ArrowsRightLeftIcon,
+  DownloadIcon,
+  EllipsisIcon,
+  FunnelIcon,
+  PencilIcon,
+  PercentIcon,
+  SearchIcon,
+  UndoIcon,
+} from '@/components/icons'
 import { matchesSearch } from '@/lib/search'
 import { isEditableKind } from '@/lib/entryForm'
 import { entriesToCsv } from '@/lib/exportMovements'
@@ -11,10 +22,12 @@ import { useConfirm } from '@/components/confirmContext'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
 import { cn } from '@/lib/cn'
-import { formatDate, formatMonthLabel, recentMonths, todayISO } from '@/lib/dates'
+import { dayLabel, formatLongDate, formatMonthLabel, groupByDay, recentMonths, todayISO } from '@/lib/dates'
+import { monthlyConsumo } from '@/lib/metrics'
 import {
   useAccounts,
   useEntries,
+  useMonthlyTotals,
   fetchAllEntries,
   useEntriesForSearch,
   useVoidEntry,
@@ -46,6 +59,19 @@ const KIND_TEXT: Record<string, string> = {
   transfer: 'Traspaso',
   adjustment: 'Ajuste',
 }
+const KIND_AVATAR: Record<string, { icon: typeof ArrowUpIcon; tone: string }> = {
+  expense: { icon: ArrowDownIcon, tone: 'bg-rose-50 text-rose-600' },
+  income: { icon: ArrowUpIcon, tone: 'bg-emerald-50 text-emerald-600' },
+  transfer: { icon: ArrowsRightLeftIcon, tone: 'bg-slate-100 text-slate-600' },
+  adjustment: { icon: PercentIcon, tone: 'bg-amber-50 text-amber-600' },
+}
+const KIND_CHIPS: { value: EntryFilters['kind']; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'expense', label: 'Gastos' },
+  { value: 'income', label: 'Ingresos' },
+  { value: 'transfer', label: 'Traspasos' },
+  { value: 'adjustment', label: 'Ajustes' },
+]
 
 const ACCOUNT_GROUPS: { type: Account['type']; label: string }[] = [
   { type: 'asset', label: 'Cuentas' },
@@ -68,6 +94,8 @@ export function MovimientosPage() {
   const [editing, setEditing] = useState<EntryWithLines | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [actionsOpen, setActionsOpen] = useState(false)
+  const [detail, setDetail] = useState<EntryWithLines | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [month, setMonth] = useState<string>(MONTHS[0]!)
   const [kind, setKind] = useState<EntryFilters['kind']>('all')
   const [accountId, setAccountId] = useState<string>('all')
@@ -84,6 +112,7 @@ export function MovimientosPage() {
 
   const serverFilters: EntryQueryFilters = { month, kind, accountId, hideVoided }
   const accounts = useAccounts()
+  const totals = useMonthlyTotals()
   const paged = useEntries({ ...serverFilters, page, pageSize: PAGE_SIZE }, !searching)
   const all = useEntriesForSearch(serverFilters, searching)
   const voidEntry = useVoidEntry()
@@ -100,6 +129,18 @@ export function MovimientosPage() {
 
   const byId = new Map((accounts.data ?? []).map((a) => [a.id, a.name]))
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE))
+
+  const activeFilters = Number(accountId !== 'all') + Number(hideVoided)
+  const monthIdx = MONTHS.indexOf(month)
+  const monthTotals = month === 'all' ? null : monthlyConsumo(totals.data ?? [], month)
+
+  function clearFilters() {
+    setPage(0)
+    setKind('all')
+    setAccountId('all')
+    setHideVoided(false)
+    setSearchInput('')
+  }
 
   function resetPageAnd(fn: () => void) {
     setPage(0)
@@ -183,6 +224,63 @@ export function MovimientosPage() {
         </p>
       )}
 
+      <div className="mb-3 flex items-center justify-between rounded-2xl border border-slate-200/70 bg-surface p-1">
+        <button
+          type="button"
+          aria-label="Mes anterior"
+          disabled={monthIdx < 0 || monthIdx >= MONTHS.length - 1}
+          onClick={() => resetPageAnd(() => setMonth(MONTHS[monthIdx + 1]!))}
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+        >
+          ‹
+        </button>
+        <select
+          aria-label="Mes"
+          value={month}
+          onChange={(e) => resetPageAnd(() => setMonth(e.target.value))}
+          className="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent text-center font-semibold text-slate-900 focus:outline-none"
+        >
+          <option value="all">Todos los meses</option>
+          {MONTHS.map((m) => (
+            <option key={m} value={m}>
+              {formatMonthLabel(m)}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          aria-label="Mes siguiente"
+          disabled={monthIdx <= 0}
+          onClick={() => resetPageAnd(() => setMonth(MONTHS[monthIdx - 1]!))}
+          className="flex h-10 w-10 items-center justify-center rounded-xl text-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+        >
+          ›
+        </button>
+      </div>
+
+      {monthTotals && (
+        <dl className="card mb-4 grid grid-cols-3 divide-x divide-slate-100 p-3 text-center">
+          <div>
+            <dt className="text-xs text-slate-500">Ingresos</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-emerald-600">
+              <Money cents={monthTotals.incomeCents} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Gastos</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-rose-600">
+              <Money cents={monthTotals.expenseCents} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Neto</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-slate-900">
+              <Money cents={monthTotals.netCents} />
+            </dd>
+          </div>
+        </dl>
+      )}
+
       <div className="relative mb-3">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <Input
@@ -205,74 +303,98 @@ export function MovimientosPage() {
         )}
       </div>
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:items-center">
-        <label className="flex min-w-0 flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:gap-2">
-          Mes
-          <Select
-            className="w-full sm:w-auto"
-            value={month}
-            onChange={(e) => resetPageAnd(() => setMonth(e.target.value))}
+      <div className="-mx-4 mb-3 flex items-center gap-2 overflow-x-auto px-4 pb-1">
+        {KIND_CHIPS.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            aria-pressed={kind === c.value}
+            onClick={() => resetPageAnd(() => setKind(c.value))}
+            className={cn(
+              'shrink-0 rounded-full border px-3.5 py-1.5 text-sm font-medium transition',
+              kind === c.value
+                ? 'border-brand bg-brand text-white'
+                : 'border-slate-200 bg-surface text-slate-600 hover:bg-slate-50',
+            )}
           >
-            <option value="all">Todos</option>
-            {MONTHS.map((m) => (
-              <option key={m} value={m}>
-                {formatMonthLabel(m)}
-              </option>
-            ))}
-          </Select>
-        </label>
-        <label className="flex min-w-0 flex-col gap-1 text-sm text-slate-600 sm:flex-row sm:items-center sm:gap-2">
-          Tipo
-          <Select
-            className="w-full sm:w-auto"
-            value={kind}
-            onChange={(e) =>
-              resetPageAnd(() => setKind(e.target.value as EntryFilters['kind']))
-            }
-          >
-            <option value="all">Todos</option>
-            <option value="expense">Gasto</option>
-            <option value="income">Ingreso</option>
-            <option value="transfer">Traspaso</option>
-            <option value="adjustment">Ajuste</option>
-          </Select>
-        </label>
-        <label className="col-span-2 flex min-w-0 flex-col gap-1 text-sm text-slate-600 sm:col-auto sm:flex-row sm:items-center sm:gap-2">
-          Cuenta
-          <Select
-            className="w-full sm:w-auto sm:max-w-[14rem]"
-            value={accountId}
-            onChange={(e) => resetPageAnd(() => setAccountId(e.target.value))}
-          >
-            <option value="all">Todas</option>
-            {ACCOUNT_GROUPS.map((g) => {
-              const items = (accounts.data ?? [])
-                .filter((a) => a.type === g.type)
-                .sort((a, b) => Number(a.is_archived) - Number(b.is_archived))
-              if (items.length === 0) return null
-              return (
-                <optgroup key={g.type} label={g.label}>
-                  {items.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                      {a.is_archived ? ' (archivada)' : ''}
-                    </option>
-                  ))}
-                </optgroup>
-              )
-            })}
-          </Select>
-        </label>
-        <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 sm:col-auto">
-          <input
-            type="checkbox"
-            className="h-4 w-4 rounded border-slate-300 text-brand"
-            checked={hideVoided}
-            onChange={(e) => resetPageAnd(() => setHideVoided(e.target.checked))}
-          />
-          Ocultar anulados
-        </label>
+            {c.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-expanded={filtersOpen}
+          onClick={() => setFiltersOpen((o) => !o)}
+          className={cn(
+            'ml-auto flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition',
+            activeFilters > 0 || filtersOpen
+              ? 'border-brand-300 bg-brand-50 text-brand-700'
+              : 'border-slate-200 bg-surface text-slate-600 hover:bg-slate-50',
+          )}
+        >
+          <FunnelIcon className="h-4 w-4" />
+          Filtros{activeFilters > 0 ? ` · ${activeFilters}` : ''}
+        </button>
       </div>
+
+      {filtersOpen && (
+        <div className="card mb-4 space-y-3 p-4">
+          <label className="block text-sm text-slate-600">
+            <span className="label">Cuenta</span>
+            <Select
+              value={accountId}
+              onChange={(e) => resetPageAnd(() => setAccountId(e.target.value))}
+            >
+              <option value="all">Todas</option>
+              {ACCOUNT_GROUPS.map((g) => {
+                const items = (accounts.data ?? [])
+                  .filter((a) => a.type === g.type)
+                  .sort((a, b) => Number(a.is_archived) - Number(b.is_archived))
+                if (items.length === 0) return null
+                return (
+                  <optgroup key={g.type} label={g.label}>
+                    {items.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                        {a.is_archived ? ' (archivada)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </Select>
+          </label>
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-700">Ocultar anulados</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hideVoided}
+              aria-label="Ocultar anulados"
+              onClick={() => resetPageAnd(() => setHideVoided((v) => !v))}
+              className={cn(
+                'relative h-7 w-12 shrink-0 rounded-full transition',
+                hideVoided ? 'bg-brand' : 'bg-slate-200',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform',
+                  hideVoided && 'translate-x-5',
+                )}
+              />
+            </button>
+          </div>
+          {activeFilters > 0 && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-sm font-medium text-brand hover:underline"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       {active.isLoading || accounts.isLoading ? (
         <LoadingState label={searching ? 'Buscando…' : undefined} />
@@ -283,6 +405,11 @@ export function MovimientosPage() {
           <EmptyState
             title={`Ningún movimiento coincide con «${search}»`}
             description="Prueba con otras palabras o cambia los filtros."
+            action={
+              <Button variant="secondary" onClick={clearFilters}>
+                Limpiar filtros
+              </Button>
+            }
           />
         ) : (
           <EmptyState
@@ -293,38 +420,54 @@ export function MovimientosPage() {
         )
       ) : (
         <>
-          <Card className="divide-y divide-slate-100">
-            {rows.map((e) => (
-              <Row
-                key={e.id}
-                entry={e}
-                byId={byId}
-                onVoid={onVoid}
-                onEdit={setEditing}
-                busy={voidEntry.isPending}
-              />
+          <div className="space-y-4">
+            {groupByDay(rows).map((g) => (
+              <section key={g.date} aria-label={dayLabel(g.date)}>
+                <h2 className="mb-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {dayLabel(g.date)}
+                </h2>
+                <Card className="divide-y divide-slate-100">
+                  {g.rows.map((e) => (
+                    <Row
+                      key={e.id}
+                      entry={e}
+                      byId={byId}
+                      onOpen={setDetail}
+                      onVoid={onVoid}
+                      onEdit={setEditing}
+                      busy={voidEntry.isPending}
+                    />
+                  ))}
+                </Card>
+              </section>
             ))}
-          </Card>
+          </div>
 
-          <div className="mt-4 flex flex-col gap-2 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex items-center justify-between gap-3 text-sm text-slate-500">
             <span className="min-w-0 break-words">
-              {count} movimiento(s){searching ? ` que coinciden con «${search}»` : ''} · página {page + 1}{' '}
-              de {totalPages}
+              {count} movimiento(s){searching ? ` que coinciden con «${search}»` : ''}
             </span>
-            <div className="flex gap-2 [&>button]:flex-1 sm:[&>button]:flex-none">
+            <div className="flex shrink-0 items-center gap-2">
               <Button
                 variant="secondary"
+                className="px-3"
+                aria-label="Anterior"
                 disabled={page === 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
               >
-                Anterior
+                ‹
               </Button>
+              <span className="tabular-nums">
+                {page + 1} / {totalPages}
+              </span>
               <Button
                 variant="secondary"
+                className="px-3"
+                aria-label="Siguiente"
                 disabled={page + 1 >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Siguiente
+                ›
               </Button>
             </div>
           </div>
@@ -335,6 +478,24 @@ export function MovimientosPage() {
 
       <Modal open={editing !== null} onClose={() => setEditing(null)} title="Editar movimiento">
         {editing && <MovementForm key={editing.id} entry={editing} onDone={() => setEditing(null)} />}
+      </Modal>
+
+      <Modal open={detail !== null} onClose={() => setDetail(null)} title="Movimiento">
+        {detail && (
+          <EntryDetail
+            entry={detail}
+            byId={byId}
+            busy={voidEntry.isPending}
+            onEdit={(e) => {
+              setDetail(null)
+              setEditing(e)
+            }}
+            onVoid={(id) => {
+              setDetail(null)
+              void onVoid(id)
+            }}
+          />
+        )}
       </Modal>
 
       <Modal open={actionsOpen} onClose={() => setActionsOpen(false)} title="Más acciones">
@@ -371,52 +532,85 @@ export function MovimientosPage() {
   )
 }
 
+// Datos derivados de un movimiento, compartidos por la fila y el detalle.
+function describeEntry(entry: EntryWithLines, byId: Map<string, string>) {
+  const pos = entry.entry_lines.find((l) => l.amount_cents > 0)
+  const neg = entry.entry_lines.find((l) => l.amount_cents < 0)
+  return {
+    amount: pos?.amount_cents ?? 0,
+    fromName: neg ? (byId.get(neg.account_id) ?? '—') : '—',
+    toName: pos ? (byId.get(pos.account_id) ?? '—') : '—',
+    isAnnulled: !!entry.voided_at,
+    isAnnulment: !!entry.voids_entry_id,
+  }
+}
+
+const SIGN: Record<string, string> = { expense: '−', income: '+' }
+
 function Row({
   entry,
   byId,
+  onOpen,
   onVoid,
   onEdit,
   busy,
 }: {
   entry: EntryWithLines
   byId: Map<string, string>
+  onOpen: (entry: EntryWithLines) => void
   onVoid: (id: string) => void
   onEdit: (entry: EntryWithLines) => void
   busy: boolean
 }) {
-  const pos = entry.entry_lines.find((l) => l.amount_cents > 0)
-  const neg = entry.entry_lines.find((l) => l.amount_cents < 0)
-  const amount = pos?.amount_cents ?? 0
-  const fromName = neg ? (byId.get(neg.account_id) ?? '—') : '—'
-  const toName = pos ? (byId.get(pos.account_id) ?? '—') : '—'
-
-  const isAnnulled = !!entry.voided_at
-  const isAnnulment = !!entry.voids_entry_id
+  const { amount, fromName, toName, isAnnulled, isAnnulment } = describeEntry(entry, byId)
+  const avatar = KIND_AVATAR[entry.kind] ?? KIND_AVATAR.transfer!
+  const Icon = avatar.icon
+  const dim = isAnnulled || isAnnulment
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className={cn('badge shrink-0', KIND_BADGE[entry.kind])}>{KIND_TEXT[entry.kind]}</span>
-          {isAnnulment && <span className="badge shrink-0 bg-slate-100 text-slate-500">Anulación</span>}
-          {isAnnulled && <span className="badge shrink-0 bg-amber-50 text-amber-700">Anulado</span>}
-          <span className="truncate font-medium text-slate-800">
-            {entry.description || '(sin concepto)'}
+    <div className="group flex items-center">
+      <button
+        type="button"
+        onClick={() => onOpen(entry)}
+        className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50/70"
+      >
+        <span
+          className={cn(
+            'flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+            avatar.tone,
+            dim && 'opacity-50',
+          )}
+          aria-hidden="true"
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-2">
+            <span className={cn('truncate font-medium text-slate-900', dim && 'text-slate-500')}>
+              {entry.description || '(sin concepto)'}
+            </span>
+            {isAnnulment && <span className="badge shrink-0 bg-slate-100 text-slate-500">Anulación</span>}
+            {isAnnulled && <span className="badge shrink-0 bg-amber-50 text-amber-700">Anulado</span>}
           </span>
-        </div>
-        <p className="mt-0.5 truncate text-xs text-slate-500">
-          {formatDate(entry.occurred_on)} · {fromName} → {toName}
-        </p>
-      </div>
+          <span className="mt-0.5 block truncate text-xs text-slate-500">
+            {fromName} → {toName}
+          </span>
+        </span>
+        <span
+          className={cn(
+            'shrink-0 font-semibold tabular-nums',
+            entry.kind === 'income' && 'text-emerald-600',
+            dim && '!text-slate-400 line-through',
+          )}
+        >
+          {SIGN[entry.kind] ?? ''}
+          <Money cents={amount} />
+        </span>
+      </button>
 
-      <Money
-        cents={amount}
-        className={cn('shrink-0 font-semibold', isAnnulled && 'text-slate-400 line-through')}
-      />
-
-      {!isAnnulled && !isAnnulment && (
-        <div className="flex shrink-0 gap-1">
-          {/* Los ajustes de saldo se corrigen desde Patrimonio. */}
+      {/* Atajos solo en escritorio y al pasar el ratón; en móvil se usan desde el detalle. */}
+      {!dim && (
+        <div className="mr-3 hidden shrink-0 gap-1 opacity-0 transition group-focus-within:opacity-100 group-hover:opacity-100 md:flex">
           {isEditableKind(entry.kind) && (
             <button
               onClick={() => onEdit(entry)}
@@ -437,6 +631,70 @@ function Row({
           >
             <UndoIcon className="h-4 w-4" />
           </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EntryDetail({
+  entry,
+  byId,
+  busy,
+  onEdit,
+  onVoid,
+}: {
+  entry: EntryWithLines
+  byId: Map<string, string>
+  busy: boolean
+  onEdit: (entry: EntryWithLines) => void
+  onVoid: (id: string) => void
+}) {
+  const { amount, fromName, toName, isAnnulled, isAnnulment } = describeEntry(entry, byId)
+  const status = isAnnulled ? 'Anulado' : isAnnulment ? 'Anulación de otro movimiento' : 'Vigente'
+  const rows: [string, string][] = [
+    ['Fecha', formatLongDate(entry.occurred_on)],
+    ['Concepto', entry.description || '(sin concepto)'],
+    ['Origen', fromName],
+    ['Destino', toName],
+    ['Estado', status],
+  ]
+
+  return (
+    <div>
+      <div className="mb-4 text-center">
+        <span className={cn('badge', KIND_BADGE[entry.kind])}>{KIND_TEXT[entry.kind]}</span>
+        <p
+          className={cn(
+            'mt-2 text-3xl font-bold tracking-tight tabular-nums',
+            isAnnulled && 'text-slate-400 line-through',
+          )}
+        >
+          {SIGN[entry.kind] ?? ''}
+          <Money cents={amount} />
+        </p>
+      </div>
+      <dl className="divide-y divide-slate-100 text-sm">
+        {rows.map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-4 py-2.5">
+            <dt className="text-slate-500">{k}</dt>
+            <dd className="min-w-0 break-words text-right font-medium text-slate-900">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {!isAnnulled && !isAnnulment && (
+        <div className="mt-4 flex gap-2 [&>button]:flex-1">
+          {/* Los ajustes de saldo se corrigen desde Patrimonio. */}
+          {isEditableKind(entry.kind) && (
+            <Button variant="secondary" disabled={busy} onClick={() => onEdit(entry)}>
+              <PencilIcon className="h-4 w-4" />
+              Editar
+            </Button>
+          )}
+          <Button variant="danger" disabled={busy} onClick={() => onVoid(entry.id)}>
+            <UndoIcon className="h-4 w-4" />
+            Anular
+          </Button>
         </div>
       )}
     </div>
