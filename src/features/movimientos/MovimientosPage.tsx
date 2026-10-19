@@ -266,7 +266,7 @@ export function MovimientosPage() {
         <label className="col-span-2 flex items-center gap-2 text-sm text-slate-600 sm:col-auto">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded border-slate-300 text-indigo-600"
+            className="h-4 w-4 rounded border-slate-300 text-brand"
             checked={hideVoided}
             onChange={(e) => resetPageAnd(() => setHideVoided(e.target.checked))}
           />

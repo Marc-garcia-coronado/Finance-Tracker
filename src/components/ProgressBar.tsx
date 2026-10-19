@@ -3,7 +3,7 @@ import { cn } from '@/lib/cn'
 export type ProgressTone = 'default' | 'warning' | 'danger' | 'success'
 
 const TONE_CLASS: Record<ProgressTone, string> = {
-  default: 'bg-gradient-to-r from-indigo-500 to-violet-500',
+  default: 'bg-brand',
   warning: 'bg-gradient-to-r from-amber-400 to-amber-500',
   danger: 'bg-gradient-to-r from-rose-500 to-rose-600',
   success: 'bg-gradient-to-r from-emerald-400 to-emerald-500',

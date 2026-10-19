@@ -86,7 +86,7 @@ export function BudgetCard({ month }: { month: string }) {
     empty = (
       <>
         Configura el ingreso estimado y la asignación por % en{' '}
-        <Link to="/config" className="font-medium text-indigo-600 underline">
+        <Link to="/config" className="font-medium text-brand underline">
           Configuración
         </Link>
         .
@@ -109,7 +109,7 @@ export function BudgetCard({ month }: { month: string }) {
               onClick={() => choose(b)}
               className={cn(
                 'rounded-md px-2.5 py-1 transition',
-                base === b ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+                base === b ? 'bg-surface text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
               )}
             >
               {b === 'estimated' ? 'Estimado' : 'Real'}

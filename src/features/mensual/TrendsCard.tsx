@@ -20,7 +20,9 @@ const OTHERS_COLOR = '#94a3b8'
 
 const TOOLTIP_STYLE = {
   borderRadius: 12,
-  border: '1px solid #e2e8f0',
+  border: '1px solid rgb(var(--slate-200))',
+  background: 'rgb(var(--surface))',
+  color: 'rgb(var(--slate-900))',
   boxShadow: '0 4px 12px -4px rgb(15 23 42 / 0.12)',
   fontSize: 13,
 } as const
@@ -139,7 +141,7 @@ export function TrendsCard({ totals, month }: { totals: MonthlyTotalRow[]; month
                     name={c.name}
                     stackId="gasto"
                     fill={colorOf(c.accountId, i)}
-                    stroke="#fff"
+                    stroke="rgb(var(--surface))"
                     strokeWidth={2}
                   />
                 ))}
@@ -148,7 +150,7 @@ export function TrendsCard({ totals, month }: { totals: MonthlyTotalRow[]; month
           </div>
 
           <details className="mt-3">
-            <summary className="cursor-pointer text-xs font-medium text-indigo-600">
+            <summary className="cursor-pointer text-xs font-medium text-brand">
               Ver como tabla
             </summary>
             <div className="mt-2 overflow-x-auto">

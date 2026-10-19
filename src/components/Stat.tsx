@@ -19,7 +19,7 @@ export function Stat({
         ? 'text-rose-600'
         : 'text-slate-900'
   const dotColor =
-    tone === 'positive' ? 'bg-emerald-500' : tone === 'negative' ? 'bg-rose-500' : 'bg-indigo-400'
+    tone === 'positive' ? 'bg-emerald-500' : tone === 'negative' ? 'bg-rose-500' : 'bg-brand-400'
   return (
     <div className="card p-4">
       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">

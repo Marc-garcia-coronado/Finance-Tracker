@@ -16,7 +16,7 @@ export function DemoBanner() {
         </p>
         <button
           onClick={exitDemo}
-          className="shrink-0 rounded-lg border border-amber-400 bg-white/70 px-3 py-1 text-sm font-medium hover:bg-white"
+          className="shrink-0 rounded-lg border border-amber-400 bg-surface/70 px-3 py-1 text-sm font-medium hover:bg-surface"
         >
           Salir
         </button>

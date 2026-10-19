@@ -52,7 +52,7 @@ export function LoginPage() {
     <main className="flex min-h-full items-center justify-center p-4">
       <div className="card w-full max-w-sm p-6">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-lg font-bold text-white shadow-lg shadow-indigo-600/30">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-lg font-bold text-white shadow-lg shadow-brand/30">
             €
           </div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
@@ -104,7 +104,7 @@ export function LoginPage() {
           {mode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}{' '}
           <button
             type="button"
-            className="font-semibold text-indigo-600 hover:underline"
+            className="font-semibold text-brand hover:underline"
             onClick={() => {
               setServerError(null)
               setInfo(null)
