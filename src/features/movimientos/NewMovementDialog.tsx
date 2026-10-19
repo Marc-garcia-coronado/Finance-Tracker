@@ -28,14 +28,14 @@ export function NewMovementDialog({ open, onClose }: { open: boolean; onClose: (
               }}
               className="flex w-full items-center gap-3 rounded-xl border border-slate-200 px-3 py-3 text-left transition hover:bg-slate-50"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand">
                 <MicIcon className="h-5 w-5" />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-slate-900">Dictar con IA</span>
                 <span className="block text-xs text-slate-500">Di uno o varios movimientos seguidos.</span>
               </span>
-              <span className="badge shrink-0 bg-indigo-50 text-indigo-700">Nuevo</span>
+              <span className="badge shrink-0 bg-brand-50 text-brand-700">Nuevo</span>
             </button>
             <p className="my-3 text-center text-xs text-slate-400">o escríbelo a mano</p>
           </>

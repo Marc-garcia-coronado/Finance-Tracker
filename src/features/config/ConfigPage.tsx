@@ -22,6 +22,7 @@ import type { Enums } from '@/lib/database.types'
 import { childrenOf, orderWithChildren, parentOptions } from '@/lib/accountTree'
 import { enterDemo, exitDemo } from '@/lib/demo/demoControl'
 import { useDemoMode } from '@/lib/demo/demoMode'
+import { setTheme, useTheme, type Theme } from '@/lib/theme'
 import { setVoiceEnabled, useVoiceEnabled } from '@/lib/voiceSettings'
 import { PageTour } from '@/features/onboarding/PageTour'
 import { showOnboarding, showTour } from '@/features/onboarding/tourStorage'
@@ -47,11 +48,46 @@ export function ConfigPage() {
         incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
       />
       <AccountsCard accounts={accounts.data ?? []} />
+      <ThemeCard />
       <DemoCard />
       <VoiceCard />
       <IntegrityCard />
       <HelpCard />
     </div>
+  )
+}
+
+// --- Apariencia -------------------------------------------------------------------
+const THEMES: { value: Theme; label: string }[] = [
+  { value: 'system', label: 'Sistema' },
+  { value: 'light', label: 'Claro' },
+  { value: 'dark', label: 'Oscuro' },
+]
+
+function ThemeCard() {
+  const theme = useTheme()
+  return (
+    <Card className="p-4">
+      <h2 className="font-semibold text-slate-900">Apariencia</h2>
+      <p className="mt-1 text-sm text-slate-500">Tema de la app en este dispositivo.</p>
+      <div role="radiogroup" aria-label="Tema" className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-slate-100 p-1">
+        {THEMES.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            role="radio"
+            aria-checked={theme === t.value}
+            onClick={() => setTheme(t.value)}
+            className={cn(
+              'rounded-lg py-2 text-sm font-medium transition',
+              theme === t.value ? 'bg-surface text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700',
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+    </Card>
   )
 }
 
@@ -128,7 +164,7 @@ function VoiceCard() {
           }}
           className={cn(
             'relative h-7 w-12 shrink-0 rounded-full transition',
-            enabled ? 'bg-indigo-600' : 'bg-slate-200',
+            enabled ? 'bg-brand' : 'bg-slate-200',
           )}
         >
           <span
@@ -418,7 +454,7 @@ function AccountsCard({ accounts }: { accounts: Account[] }) {
                       {a.name}
                     </span>
                     {a.is_budget_bucket && (
-                      <span className="badge bg-indigo-50 text-indigo-700">bucket</span>
+                      <span className="badge bg-brand-50 text-brand-700">bucket</span>
                     )}
                     <button
                       onClick={() => {

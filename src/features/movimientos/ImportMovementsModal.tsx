@@ -403,7 +403,7 @@ function UploadStep({
         <code>;</code> como separador (lo habitual en español), también funciona.
       </p>
 
-      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center hover:border-indigo-400">
+      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center hover:border-brand-400">
         <span className="text-sm font-medium text-slate-700">
           {fileName || 'Selecciona un archivo CSV'}
         </span>
@@ -423,7 +423,7 @@ function UploadStep({
       <button
         type="button"
         onClick={downloadTemplate}
-        className="text-xs font-medium text-indigo-600 hover:underline"
+        className="text-xs font-medium text-brand hover:underline"
       >
         Descargar plantilla CSV
       </button>
@@ -644,7 +644,7 @@ function ConfirmStep({
               onClick={() =>
                 setForced(allForced ? new Set() : new Set(existingRows.map((r) => r.rawIndex)))
               }
-              className="text-xs font-medium text-indigo-600 hover:underline"
+              className="text-xs font-medium text-brand hover:underline"
             >
               {allForced ? 'Desmarcar todas' : 'Importar todas igualmente'}
             </button>
@@ -663,7 +663,7 @@ function ConfirmStep({
                   checked={forced.has(r.rawIndex)}
                   onChange={() => toggleForced(r.rawIndex)}
                   aria-label={`Importar igualmente: ${r.concepto || r.categoria}`}
-                  className="h-4 w-4 shrink-0 rounded border-slate-300 text-indigo-600"
+                  className="h-4 w-4 shrink-0 rounded border-slate-300 text-brand"
                 />
                 <PreviewRow row={r} bare />
               </label>

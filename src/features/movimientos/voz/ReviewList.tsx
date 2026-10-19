@@ -134,7 +134,7 @@ export function ReviewList({
         ))}
       </ul>
 
-      <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-white/95 px-5 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-5 -mb-5 border-t border-slate-100 bg-surface/95 px-5 py-3 backdrop-blur">
         {pending.length > 0 ? (
           <div className="flex items-center gap-3">
             <p className="min-w-0 flex-1 text-sm text-slate-500">
@@ -201,7 +201,7 @@ function ItemCard({
         </p>
         <button
           onClick={() => onPatch({ status: 'pending' })}
-          className="rounded-lg px-2 py-1 text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+          className="rounded-lg px-2 py-1 text-sm font-medium text-brand hover:bg-brand-50"
         >
           Deshacer
         </button>
@@ -218,7 +218,7 @@ function ItemCard({
           ? 'border-emerald-300 bg-emerald-50'
           : issue
             ? 'border-amber-300 bg-amber-50'
-            : 'border-slate-200 bg-white',
+            : 'border-slate-200 bg-surface',
       )}
     >
       <div className="flex items-start gap-3">

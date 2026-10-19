@@ -15,7 +15,7 @@ export default defineConfig({
         short_name: 'Finanzas',
         description: 'Finanzas personales por partida doble',
         lang: 'es',
-        theme_color: '#4f46e5',
+        theme_color: '#1e408c',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',

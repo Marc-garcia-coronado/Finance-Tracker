@@ -29,7 +29,9 @@ function shortMonth(m: string): string {
 
 const TOOLTIP_STYLE = {
   borderRadius: 12,
-  border: '1px solid #e2e8f0',
+  border: '1px solid rgb(var(--slate-200))',
+  background: 'rgb(var(--surface))',
+  color: 'rgb(var(--slate-900))',
   boxShadow: '0 4px 12px -4px rgb(15 23 42 / 0.12)',
   fontSize: 13,
 } as const
@@ -82,7 +84,7 @@ export function PatrimonioPage() {
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--slate-200))" vertical={false} />
                     <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                     <YAxis fontSize={12} tickLine={false} axisLine={false} width={48} />
                     <Tooltip
@@ -95,7 +97,7 @@ export function PatrimonioPage() {
                       type="monotone"
                       dataKey="value"
                       name="Patrimonio"
-                      stroke="#4f46e5"
+                      stroke="rgb(var(--brand-solid))"
                       strokeWidth={2}
                       dot={false}
                       activeDot={{ r: 4 }}
@@ -131,7 +133,7 @@ export function PatrimonioPage() {
                             balanceCents: a.balance_cents ?? 0,
                           })
                         }
-                        className="rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50"
+                        className="rounded-lg px-2 py-1 text-xs font-medium text-brand hover:bg-brand-50"
                       >
                         Ajustar
                       </button>

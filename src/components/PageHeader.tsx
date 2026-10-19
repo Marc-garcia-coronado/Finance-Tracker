@@ -22,7 +22,7 @@ export function PageHeader({
               onClick={onHelp}
               aria-label="Ver la guía de esta sección"
               title="Ver la guía de esta sección"
-              className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-xs font-semibold text-slate-400 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-slate-300 text-xs font-semibold text-slate-400 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand"
             >
               ?
             </button>

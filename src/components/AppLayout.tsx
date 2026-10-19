@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { lastDataUpdate } from '@/lib/offlineCache'
 import { useOnline } from '@/lib/useOnline'
 import { cn } from '@/lib/cn'
+import { isDark, setTheme, useTheme } from '@/lib/theme'
 import { Modal } from './Modal'
 import { NewMovementDialog } from '@/features/movimientos/NewMovementDialog'
 import { DemoBanner } from './DemoBanner'
@@ -19,9 +20,11 @@ import {
   EllipsisIcon,
   HomeIcon,
   LogoutIcon,
+  MoonIcon,
   PlusIcon,
   RepeatIcon,
   SettingsIcon,
+  SunIcon,
   TargetIcon,
 } from './icons'
 
@@ -83,7 +86,7 @@ function AutoRecurringNotice() {
   let body: ReactNode = null
   let tone = ''
   if (state.status === 'done' && state.created > 0) {
-    tone = 'border-indigo-200 bg-indigo-50 text-indigo-900'
+    tone = 'border-brand-200 bg-brand-50 text-brand-900'
     body = (
       <>
         {state.created === 1
@@ -120,6 +123,8 @@ export function AppLayout() {
   const [moreOpen, setMoreOpen] = useState(false)
   const [quickOpen, setQuickOpen] = useState(false)
   const online = useOnline()
+  const theme = useTheme()
+  const dark = isDark(theme)
 
   const moreActive = MORE.some((item) => location.pathname.startsWith(item.to))
 
@@ -143,14 +148,14 @@ export function AppLayout() {
         className={({ isActive }) =>
           cn(
             'flex min-w-0 flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
-            isActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
+            isActive ? 'text-brand' : 'text-slate-500 hover:text-slate-700',
           )
         }
       >
         {({ isActive }) => (
           <>
             <span
-              className={cn('rounded-full px-3.5 py-0.5 transition', isActive && 'bg-indigo-100/80')}
+              className={cn('rounded-full px-3.5 py-0.5 transition', isActive && 'bg-brand-100/80')}
             >
               <item.icon className="h-6 w-6" />
             </span>
@@ -163,18 +168,25 @@ export function AppLayout() {
 
   return (
     <div className="min-h-full">
-      <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg">
+      <header className="sticky top-0 z-10 border-b border-slate-200/70 bg-surface/80 backdrop-blur-lg">
         <DemoBanner />
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-indigo-600/30">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand text-sm font-bold text-white shadow-md shadow-brand/30">
             €
           </div>
           <span className="font-bold tracking-tight text-slate-900">Finanzas</span>
           <button
+            onClick={() => setTheme(dark ? 'light' : 'dark')}
+            aria-label={dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+            className="ml-auto rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 md:ml-auto"
+          >
+            {dark ? <SunIcon className="h-5 w-5" /> : <MoonIcon className="h-5 w-5" />}
+          </button>
+          <button
             onClick={() => setQuickOpen(true)}
             disabled={!online}
             title={online ? undefined : 'Sin conexión'}
-            className="btn-primary ml-auto hidden md:inline-flex"
+            className="btn-primary hidden md:inline-flex"
           >
             <PlusIcon className="h-4 w-4" />
             Nuevo movimiento
@@ -200,7 +212,7 @@ export function AppLayout() {
                 cn(
                   'whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition',
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700'
+                    ? 'bg-brand-50 text-brand-700'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900',
                 )
               }
@@ -220,7 +232,7 @@ export function AppLayout() {
       {/* Barra de pestañas inferior (solo móvil) */}
       <nav
         aria-label="Secciones"
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/70 bg-white/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42_/_0.12)] backdrop-blur-lg md:hidden"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200/70 bg-surface/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_16px_-8px_rgb(15_23_42_/_0.12)] backdrop-blur-lg md:hidden"
       >
         <div className="mx-auto grid max-w-md grid-cols-5">
           {PRIMARY.slice(0, 2).map((item) => renderTab(item))}
@@ -230,7 +242,7 @@ export function AppLayout() {
             aria-label="Añadir movimiento"
             className="flex items-center justify-center disabled:opacity-40"
           >
-            <span className="-mt-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/40 transition active:scale-95">
+            <span className="-mt-4 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/40 transition active:scale-95">
               <PlusIcon className="h-6 w-6" strokeWidth={2.2} />
             </span>
           </button>
@@ -241,13 +253,13 @@ export function AppLayout() {
             aria-expanded={moreOpen}
             className={cn(
               'flex min-w-0 flex-col items-center gap-0.5 py-1.5 text-[11px] font-medium transition',
-              moreActive ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700',
+              moreActive ? 'text-brand' : 'text-slate-500 hover:text-slate-700',
             )}
           >
             <span
               className={cn(
                 'rounded-full px-3.5 py-0.5 transition',
-                moreActive && 'bg-indigo-100/80',
+                moreActive && 'bg-brand-100/80',
               )}
             >
               <EllipsisIcon className="h-6 w-6" />
@@ -267,13 +279,13 @@ export function AppLayout() {
                 onClick={() => goTo(item.to)}
                 className={cn(
                   'flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition',
-                  active ? 'bg-indigo-50' : 'hover:bg-slate-50',
+                  active ? 'bg-brand-50' : 'hover:bg-slate-50',
                 )}
               >
                 <span
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                    active ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600',
+                    active ? 'bg-brand-100 text-brand' : 'bg-slate-100 text-slate-600',
                   )}
                 >
                   <item.icon className="h-5 w-5" />
@@ -282,7 +294,7 @@ export function AppLayout() {
                   <span
                     className={cn(
                       'block text-sm font-medium',
-                      active ? 'text-indigo-700' : 'text-slate-900',
+                      active ? 'text-brand-700' : 'text-slate-900',
                     )}
                   >
                     {item.label}

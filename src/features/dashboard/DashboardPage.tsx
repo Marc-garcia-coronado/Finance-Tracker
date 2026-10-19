@@ -39,11 +39,13 @@ import {
 import { showOnboarding } from '@/features/onboarding/tourStorage'
 
 const MONTH_NAMES = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-const PIE_COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+const PIE_COLORS = ['#2f5fb8', '#0ea5e9', '#10b981', '#f59e0b', '#0d9488', '#64748b']
 
 const TOOLTIP_STYLE = {
   borderRadius: 12,
-  border: '1px solid #e2e8f0',
+  border: '1px solid rgb(var(--slate-200))',
+  background: 'rgb(var(--surface))',
+  color: 'rgb(var(--slate-900))',
   boxShadow: '0 4px 12px -4px rgb(15 23 42 / 0.12)',
   fontSize: 13,
 } as const

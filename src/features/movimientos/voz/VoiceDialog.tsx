@@ -177,10 +177,10 @@ function VoiceFlow({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={listening ? finishDictation : speech.start}
             aria-label={listening ? 'Terminar de dictar' : 'Empezar a dictar'}
-            className="relative flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-600/30 transition active:scale-95"
+            className="relative flex h-20 w-20 items-center justify-center rounded-full bg-brand text-white shadow-lg shadow-brand/30 transition active:scale-95"
           >
             {listening && (
-              <span className="absolute inset-0 animate-ping rounded-full border-2 border-indigo-400 motion-reduce:animate-none" />
+              <span className="absolute inset-0 animate-ping rounded-full border-2 border-brand-400 motion-reduce:animate-none" />
             )}
             <MicIcon className="relative h-9 w-9" />
           </button>

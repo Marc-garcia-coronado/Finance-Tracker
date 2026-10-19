@@ -171,7 +171,7 @@ function UnlockVault() {
       </form>
       <button
         type="button"
-        className="text-xs font-medium text-indigo-600 hover:underline"
+        className="text-xs font-medium text-brand hover:underline"
         onClick={() => {
           setMode((m) => (m === 'pass' ? 'recovery' : 'pass'))
           setValue('')
