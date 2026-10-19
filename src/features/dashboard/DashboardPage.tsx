@@ -1,10 +1,7 @@
 import { useMemo, type ReactNode } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Link } from 'react-router-dom'
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -22,21 +19,20 @@ import { Money } from '@/components/Money'
 import { Delta, Stat } from '@/components/Stat'
 import { ProgressBar } from '@/components/ProgressBar'
 import { ErrorState, LoadingState } from '@/components/states'
-import { formatEuro, centsToEuro } from '@/lib/money'
+import { formatCompactEuro, formatEuro, centsToEuro } from '@/lib/money'
 import { currentMonthKey, currentYear } from '@/lib/dates'
+import { NetWorthHero } from '@/components/NetWorthHero'
 import { BudgetCard } from '@/features/mensual/BudgetCard'
 import {
   monthlyConsumo,
   monthsToTarget,
   necessitiesFloorCents,
-  netWorthChange,
   recommendedAllocations,
   relativeChange,
   savingsRate,
   shiftMonth,
   yearConsumo,
   type Consumo,
-  type NetWorthPoint,
   type RecommendedAllocation,
 } from '@/lib/metrics'
 import {
@@ -70,55 +66,6 @@ function greeting(): { title: string; subtitle: string } {
   const title = h < 6 ? 'Buenas noches' : h < 13 ? 'Buenos días' : h < 21 ? 'Buenas tardes' : 'Buenas noches'
   const date = format(now, "EEEE d 'de' MMMM", { locale: es })
   return { title, subtitle: date.charAt(0).toUpperCase() + date.slice(1) }
-}
-
-// --- Hero de patrimonio -------------------------------------------------------------
-function NetWorthHero({ totalCents, history }: { totalCents: number; history: NetWorthPoint[] }) {
-  const change = netWorthChange(history)
-  const spark = history.slice(-12).map((p) => ({ label: p.month, value: centsToEuro(p.cents) }))
-
-  return (
-    <section className="relative overflow-hidden rounded-2xl bg-brand p-5 text-white shadow-lg shadow-brand/25">
-      <p className="text-xs font-medium uppercase tracking-wide text-white/70">Patrimonio total</p>
-      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <p className="text-4xl font-bold tracking-tight tabular-nums">{formatEuro(totalCents)}</p>
-        {change && <Delta cents={change.cents} ratio={change.ratio} onBrand />}
-      </div>
-      {change && <p className="mt-1 text-xs text-white/70">frente al mes anterior</p>}
-
-      {spark.length >= 2 ? (
-        <div className="-mx-5 mt-3 h-24" aria-hidden="true">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={spark} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="hero-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#fff" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#fff" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#fff"
-                strokeWidth={2}
-                fill="url(#hero-fill)"
-                isAnimationActive={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-white/70">Aún no hay movimientos para dibujar la evolución.</p>
-      )}
-
-      <Link
-        to="/patrimonio"
-        className="mt-2 inline-block text-sm font-medium text-white/90 underline-offset-4 hover:underline"
-      >
-        Ver patrimonio →
-      </Link>
-    </section>
-  )
 }
 
 // --- Este mes vs mes anterior ---------------------------------------------------------
@@ -204,7 +151,7 @@ function YearChart({
               tickLine={false}
               axisLine={false}
               width={40}
-              tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 100) / 10}k` : String(v))}
+              tickFormatter={formatCompactEuro}
             />
             <Tooltip
               formatter={(v: number) => formatEuro(Math.round(v * 100))}
@@ -448,7 +395,7 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <NetWorthHero totalCents={netWorth} history={history.data ?? []} />
+          <NetWorthHero totalCents={netWorth} history={history.data ?? []} link />
         </div>
         <MonthStats current={monthNow} previous={monthPrev} />
       </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { centsToEuro, euroToCents, formatEuro } from './money'
+import { centsToEuro, euroToCents, formatCompactEuro, formatEuro } from './money'
 
 describe('euroToCents', () => {
   it('parsea decimales con coma (es-ES)', () => {
@@ -54,5 +54,16 @@ describe('formatEuro / centsToEuro', () => {
 
   it('ida y vuelta euroToCents -> formatEuro', () => {
     expect(norm(formatEuro(euroToCents('12.345,67')))).toBe('12.345,67 €')
+  })
+})
+
+describe('formatCompactEuro', () => {
+  it('abrevia miles con coma decimal y respeta el signo', () => {
+    expect(formatCompactEuro(500)).toBe('500')
+    expect(formatCompactEuro(1000)).toBe('1k')
+    expect(formatCompactEuro(1250)).toBe('1,3k')
+    expect(formatCompactEuro(12000)).toBe('12k')
+    expect(formatCompactEuro(-2500)).toBe('-2,5k')
+    expect(formatCompactEuro(0)).toBe('0')
   })
 })

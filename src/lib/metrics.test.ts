@@ -10,6 +10,7 @@ import {
   netWorthChange,
   netWorthSeries,
   savingsRate,
+  seriesChange,
   shiftMonth,
   yearConsumo,
   type MonthlyTotalRow,
@@ -122,6 +123,27 @@ describe('netWorthChange', () => {
 
   it('ratio null si el mes anterior era 0', () => {
     expect(netWorthChange(p(0, 100))).toEqual({ cents: 100, ratio: null })
+  })
+})
+
+describe('seriesChange', () => {
+  const p = (...c: number[]) => c.map((cents, i) => ({ month: `2026-0${i + 1}`, cents }))
+
+  it('null con menos de dos puntos', () => {
+    expect(seriesChange([], 6)).toBeNull()
+    expect(seriesChange(p(100), 6)).toBeNull()
+  })
+
+  it('compara con el punto de hace N meses', () => {
+    expect(seriesChange(p(100, 120, 150, 200), 2)).toEqual({ cents: 80, ratio: 80 / 120 })
+  })
+
+  it('usa el primer punto si la serie es más corta que el rango', () => {
+    expect(seriesChange(p(100, 150), 12)).toEqual({ cents: 50, ratio: 0.5 })
+  })
+
+  it('ratio null si la base es 0', () => {
+    expect(seriesChange(p(0, 100), 1)).toEqual({ cents: 100, ratio: null })
   })
 })
 
