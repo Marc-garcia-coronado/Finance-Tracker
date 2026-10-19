@@ -1,4 +1,4 @@
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, subDays } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 // Clave de mes 'YYYY-MM' a partir de una fecha o ISO date.
@@ -54,3 +54,31 @@ export function recentMonths(count: number): string[] {
 }
 
 export const todayISO = (): string => format(new Date(), 'yyyy-MM-dd')
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+// Cabecera de día: «Hoy», «Ayer» o «Lunes 13 de octubre» (con año si no es el actual).
+export function dayLabel(iso: string, today: string = todayISO()): string {
+  if (iso === today) return 'Hoy'
+  if (iso === format(subDays(parseISO(today), 1), 'yyyy-MM-dd')) return 'Ayer'
+  const sameYear = iso.slice(0, 4) === today.slice(0, 4)
+  return capitalize(format(parseISO(iso), sameYear ? "EEEE d 'de' MMMM" : "EEEE d 'de' MMMM 'de' yyyy", { locale: es }))
+}
+
+// Fecha larga: «13 de octubre de 2026».
+export function formatLongDate(iso: string): string {
+  return format(parseISO(iso), "d 'de' MMMM 'de' yyyy", { locale: es })
+}
+
+// Agrupa filas consecutivas con la misma fecha; conserva el orden recibido.
+export function groupByDay<T extends { occurred_on: string }>(
+  rows: T[],
+): { date: string; rows: T[] }[] {
+  const groups: { date: string; rows: T[] }[] = []
+  for (const r of rows) {
+    const last = groups[groups.length - 1]
+    if (last && last.date === r.occurred_on) last.rows.push(r)
+    else groups.push({ date: r.occurred_on, rows: [r] })
+  }
+  return groups
+}

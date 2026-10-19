@@ -239,3 +239,19 @@ export function MoonIcon(props: IconProps) {
     </Base>
   )
 }
+
+export function ArrowDownIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 5v14m0 0-5-5m5 5 5-5" />
+    </Base>
+  )
+}
+
+export function ArrowUpIcon(props: IconProps) {
+  return (
+    <Base {...props}>
+      <path d="M12 19V5m0 0-5 5m5-5 5 5" />
+    </Base>
+  )
+}

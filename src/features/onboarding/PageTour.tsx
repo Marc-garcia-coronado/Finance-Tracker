@@ -54,13 +54,13 @@ const PAGE_TOURS: Record<TourId, TourStep[]> = {
       icon: FunnelIcon,
       title: 'Encuentra cualquier cosa',
       description:
-        'Usa los filtros de mes y tipo para revisar lo que quieras: los gastos de este mes, solo los ingresos, los traspasos… La lista se pagina de 20 en 20.',
+        'Cambia de mes con las flechas, filtra por tipo con los botones de arriba y busca por concepto. En «Filtros» eliges cuenta u ocultas los anulados. Los movimientos se agrupan por día y se paginan de 20 en 20.',
     },
     {
       icon: UndoIcon,
       title: '¿Un error? Anula, no borres',
       description:
-        'El botón «Anular» crea el movimiento inverso en vez de borrar: tus saldos vuelven a cuadrar y el historial queda intacto. Es contabilidad por partida doble.',
+        'Toca un movimiento para ver su detalle, editarlo o anularlo. «Anular» crea el movimiento inverso en vez de borrar: tus saldos vuelven a cuadrar y el historial queda intacto. Es contabilidad por partida doble.',
     },
   ],
   mensual: [
