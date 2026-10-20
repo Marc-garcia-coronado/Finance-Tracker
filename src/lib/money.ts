@@ -19,6 +19,13 @@ export function centsToEuro(cents: number): number {
   return cents / 100
 }
 
+// Euros (número de display) en forma corta para ejes: 1250 -> "1,3k", -2500 -> "-2,5k".
+export function formatCompactEuro(euros: number): string {
+  const a = Math.abs(euros)
+  const body = a >= 1000 ? `${String(Math.round(a / 100) / 10).replace('.', ',')}k` : String(Math.round(a))
+  return euros < 0 ? `-${body}` : body
+}
+
 // Parsea un importe escrito por el usuario (es-ES o con punto decimal) a céntimos
 // enteros, redondeando al céntimo. Lanza si no es un número válido.
 //   "12,50" -> 1250   "1.234,56" -> 123456   "12.5" -> 1250   "-3" -> -300

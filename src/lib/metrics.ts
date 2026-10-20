@@ -249,16 +249,21 @@ export function netWorthSeries(
   return out
 }
 
-// Variación del patrimonio entre los dos últimos puntos de la serie. null con
-// menos de dos puntos; `ratio` es null si el mes anterior estaba a 0 o negativo.
-export function netWorthChange(
+// Variación entre el último punto de la serie y el de `monthsBack` meses antes (o el
+// primero si la serie es más corta). null con menos de dos puntos; `ratio` es null si la
+// base es 0 o negativa.
+export function seriesChange(
   series: NetWorthPoint[],
+  monthsBack: number,
 ): { cents: number; ratio: number | null } | null {
   if (series.length < 2) return null
-  const prev = series[series.length - 2]!.cents
-  const cents = series[series.length - 1]!.cents - prev
-  return { cents, ratio: relativeChange(cents + prev, prev) }
+  const base = series[Math.max(0, series.length - 1 - monthsBack)]!.cents
+  const last = series[series.length - 1]!.cents
+  return { cents: last - base, ratio: relativeChange(last, base) }
 }
+
+// Variación del patrimonio frente al mes anterior.
+export const netWorthChange = (series: NetWorthPoint[]) => seriesChange(series, 1)
 
 // Meses estimados para cubrir lo que falta a un ritmo mensual.
 export function monthsToTarget(
