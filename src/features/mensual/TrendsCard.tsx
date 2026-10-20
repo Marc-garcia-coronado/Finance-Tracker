@@ -65,8 +65,8 @@ export function TrendsCard({ totals, month }: { totals: MonthlyTotalRow[]; month
   return (
     <div className="space-y-4">
       <Card>
-        <div className="border-b border-slate-200 px-4 py-3">
-          <p className="text-sm font-medium text-slate-700">Gasto frente a lo habitual</p>
+        <div className="border-b border-slate-100 p-4">
+          <h2 className="font-semibold text-slate-900">Gasto frente a lo habitual</h2>
           <p className="text-xs text-slate-500">
             Cada categoría frente al mes anterior y a la media de los {HISTORY_MONTHS} meses
             previos con datos.
@@ -113,9 +113,9 @@ export function TrendsCard({ totals, month }: { totals: MonthlyTotalRow[]; month
 
       {series.categories.length > 0 && (
         <Card className="p-4">
-          <p className="mb-3 text-sm font-medium text-slate-700">
+          <h2 className="mb-3 font-semibold text-slate-900">
             Gasto por categoría, últimos {HISTORY_MONTHS} meses
-          </p>
+          </h2>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 4, right: 8, left: 8, bottom: 0 }}>
