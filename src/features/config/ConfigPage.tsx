@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { PageHeader } from '@/components/PageHeader'
 import { Button, Card, Field, Input, Select } from '@/components/ui'
 import { Modal } from '@/components/Modal'
+import { PencilIcon } from '@/components/icons'
 import { ErrorState, LoadingState } from '@/components/states'
 import { cn } from '@/lib/cn'
 import { formatEuro, tryEuroToCents } from '@/lib/money'
@@ -38,22 +39,43 @@ export function ConfigPage() {
     return <ErrorState error={settings.error} onRetry={() => settings.refetch()} />
 
   return (
-    <div className="space-y-6">
+    <div>
       <PageTour id="config" />
-      <PageHeader title="Configuración" onHelp={() => showTour('config')} />
-      <IncomeCard incomeCents={settings.data?.estimated_monthly_income_cents ?? 0} />
-      <AllocationsCard
-        accounts={accounts.data ?? []}
-        allocations={allocations.data ?? []}
-        incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
+      <PageHeader
+        title="Configuración"
+        subtitle="Presupuesto, cuentas y preferencias"
+        onHelp={() => showTour('config')}
       />
-      <AccountsCard accounts={accounts.data ?? []} />
-      <ThemeCard />
-      <DemoCard />
-      <VoiceCard />
-      <IntegrityCard />
-      <HelpCard />
+      <div className="space-y-4">
+        <SectionTitle>Presupuesto</SectionTitle>
+        <IncomeCard incomeCents={settings.data?.estimated_monthly_income_cents ?? 0} />
+        <AllocationsCard
+          accounts={accounts.data ?? []}
+          allocations={allocations.data ?? []}
+          incomeCents={settings.data?.estimated_monthly_income_cents ?? 0}
+        />
+
+        <SectionTitle>Cuentas</SectionTitle>
+        <AccountsCard accounts={accounts.data ?? []} />
+
+        <SectionTitle>Preferencias</SectionTitle>
+        <ThemeCard />
+        <VoiceCard />
+        <DemoCard />
+
+        <SectionTitle>Datos y ayuda</SectionTitle>
+        <IntegrityCard />
+        <HelpCard />
+      </div>
     </div>
+  )
+}
+
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <h2 className="px-1 pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      {children}
+    </h2>
   )
 }
 
@@ -362,18 +384,22 @@ function AllocationsCard({
         Reparto de la nómina entre buckets. Debe sumar 100%.
       </p>
 
-      <div className="space-y-2">
+      <ul className="divide-y divide-slate-100">
         {buckets.map((b) => {
           const pct = Number(percents[b.id]) || 0
           return (
-            <div key={b.id} className="flex items-center gap-3">
-              <span className="flex-1 text-sm text-slate-700">{b.name}</span>
-              <span className="w-28 text-right text-xs text-slate-500">
-                {formatEuro(Math.round((incomeCents * pct) / 100))}
+            <li key={b.id} className="flex items-center gap-3 py-2.5">
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-slate-800">{b.name}</span>
+                <span className="text-xs tabular-nums text-slate-500">
+                  {formatEuro(Math.round((incomeCents * pct) / 100))}
+                </span>
               </span>
-              <div className="flex w-24 items-center gap-1">
+              <div className="flex w-24 shrink-0 items-center gap-1">
                 <Input
                   type="number"
+                  inputMode="decimal"
+                  aria-label={`Porcentaje de ${b.name}`}
                   min={0}
                   max={100}
                   step="0.01"
@@ -383,14 +409,14 @@ function AllocationsCard({
                 />
                 <span className="text-sm text-slate-500">%</span>
               </div>
-            </div>
+            </li>
           )
         })}
-      </div>
+      </ul>
 
-      <div className="mt-3 flex items-center gap-3 border-t border-slate-100 pt-3">
-        <span className="flex-1 text-sm font-medium text-slate-700">Total</span>
-        <span className={cn('text-sm font-semibold', valid ? 'text-emerald-600' : 'text-rose-600')}>
+      <div className="flex items-center gap-3 border-t border-slate-200 pt-3 font-semibold">
+        <span className="flex-1 text-sm">Total</span>
+        <span className={cn('text-sm', valid ? 'text-emerald-600' : 'text-rose-600')}>
           {sum.toFixed(2).replace('.', ',')}%
         </span>
       </div>
@@ -440,16 +466,16 @@ function AccountsCard({ accounts }: { accounts: Account[] }) {
           if (items.length === 0) return null
           return (
             <div key={g}>
-              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+              <p className="mb-1.5 text-xs font-medium text-slate-500">
                 {TYPE_LABEL[g]}
               </p>
               <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
                 {orderWithChildren(items).map(({ account: a, depth }) => (
                   <div
                     key={a.id}
-                    className={cn('flex items-center gap-2 px-3 py-2', depth === 1 && 'bg-slate-50/60 pl-8')}
+                    className={cn('flex items-center gap-2 px-3 py-1.5', depth === 1 && 'bg-slate-50/60 pl-8')}
                   >
-                    <span className={cn('flex-1 text-sm', a.is_archived ? 'text-slate-400 line-through' : 'text-slate-800')}>
+                    <span className={cn('min-w-0 flex-1 truncate text-sm', a.is_archived ? 'text-slate-400 line-through' : 'text-slate-800')}>
                       {depth === 1 && <span className="mr-1 text-slate-300">↳</span>}
                       {a.name}
                     </span>
@@ -461,13 +487,15 @@ function AccountsCard({ accounts }: { accounts: Account[] }) {
                         setEditing(a)
                         setOpen(true)
                       }}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
+                      aria-label={`Editar ${a.name}`}
+                      title="Editar"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 hover:bg-brand-50 hover:text-brand"
                     >
-                      Editar
+                      <PencilIcon className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => archive.mutate({ id: a.id, archived: !a.is_archived })}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-slate-100"
+                      className="shrink-0 rounded-lg px-2 py-2 text-xs font-medium text-slate-400 hover:bg-slate-100"
                     >
                       {a.is_archived ? 'Restaurar' : 'Archivar'}
                     </button>
