@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal'
 import { useConfirm } from '@/components/confirmContext'
 import { Money } from '@/components/Money'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { PencilIcon, RepeatIcon, TrashIcon } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { tryEuroToCents } from '@/lib/money'
 import { currentMonthKey, formatMonthLabel, recentMonths, todayISO } from '@/lib/dates'
@@ -24,6 +25,13 @@ import { PageTour } from '@/features/onboarding/PageTour'
 import { showTour } from '@/features/onboarding/tourStorage'
 
 const MONTHS = recentMonths(6)
+
+// Color del icono según el tipo de plantilla.
+const KIND_STYLE: Record<string, string> = {
+  expense: 'bg-rose-50 text-rose-600',
+  income: 'bg-emerald-50 text-emerald-600',
+  transfer: 'bg-brand-50 text-brand',
+}
 
 export function RecurrentesPage() {
   const recurring = useRecurring()
@@ -42,7 +50,13 @@ export function RecurrentesPage() {
     return <ErrorState error={recurring.error} onRetry={() => recurring.refetch()} />
 
   const byId = new Map((accounts.data ?? []).map((a) => [a.id, a.name]))
-  const list = recurring.data ?? []
+  const list = [...(recurring.data ?? [])].sort((a, b) => a.day_of_month - b.day_of_month)
+  // Equivalente mensual de las plantillas activas (las anuales se prorratean; los traspasos no cuentan).
+  const fixed = { income: 0, expense: 0 }
+  for (const r of list) {
+    if (!r.is_active || (r.kind !== 'income' && r.kind !== 'expense')) continue
+    fixed[r.kind] += r.cadence === 'annual' ? Math.round(r.amount_cents / 12) : r.amount_cents
+  }
 
   async function onGenerate() {
     setGenMsg(null)
@@ -85,19 +99,56 @@ export function RecurrentesPage() {
         }
       />
 
-      <Card className="mb-4 flex flex-wrap items-center gap-3 p-4">
-        <span className="text-sm font-medium text-slate-700">Generar movimientos de</span>
-        <Select className="w-auto" value={genMonth} onChange={(e) => setGenMonth(e.target.value)}>
-          {MONTHS.map((m) => (
-            <option key={m} value={m}>
-              {formatMonthLabel(m)}
-            </option>
-          ))}
-        </Select>
-        <Button onClick={onGenerate} loading={generate.isPending}>
-          Generar
-        </Button>
-        {genMsg && <span className="text-sm text-slate-600">{genMsg}</span>}
+      {list.length > 0 && (
+        <dl className="card mb-4 grid grid-cols-3 divide-x divide-slate-100 p-3 text-center">
+          <div>
+            <dt className="text-xs text-slate-500">Ingresos fijos/mes</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-emerald-600">
+              <Money cents={fixed.income} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Gastos fijos/mes</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-rose-600">
+              <Money cents={fixed.expense} />
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-slate-500">Neto/mes</dt>
+            <dd className="mt-0.5 text-sm font-semibold text-slate-900">
+              <Money cents={fixed.income - fixed.expense} />
+            </dd>
+          </div>
+        </dl>
+      )}
+
+      <Card className="mb-4 p-4">
+        <h2 className="font-semibold text-slate-900">Generar movimientos</h2>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Crea los movimientos de las plantillas activas en el mes elegido.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <Select
+            aria-label="Mes a generar"
+            className="min-w-0 flex-1"
+            value={genMonth}
+            onChange={(e) => setGenMonth(e.target.value)}
+          >
+            {MONTHS.map((m) => (
+              <option key={m} value={m}>
+                {formatMonthLabel(m)}
+              </option>
+            ))}
+          </Select>
+          <Button onClick={onGenerate} loading={generate.isPending}>
+            Generar
+          </Button>
+        </div>
+        {genMsg && (
+          <p className="mt-2 text-sm text-slate-600" role="status">
+            {genMsg}
+          </p>
+        )}
       </Card>
 
       {list.length === 0 ? (
@@ -116,43 +167,54 @@ export function RecurrentesPage() {
           }
         />
       ) : (
-        <Card className="divide-y divide-slate-100">
-          {list.map((r) => (
-            <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-medium text-slate-800">{r.description}</span>
-                  {!r.is_active && (
-                    <span className="badge bg-slate-100 text-slate-500">Inactiva</span>
+        <Card>
+          <ul className="divide-y divide-slate-100">
+            {list.map((r) => (
+              <li key={r.id} className={cn('flex items-center gap-3 px-4 py-3', !r.is_active && 'opacity-60')}>
+                <span
+                  className={cn(
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                    KIND_STYLE[r.kind] ?? KIND_STYLE.transfer,
                   )}
-                  <span className="badge bg-slate-100 text-slate-500">
+                  aria-hidden="true"
+                >
+                  <RepeatIcon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-slate-900">{r.description}</p>
+                  <p className="truncate text-xs text-slate-500">
                     {r.cadence === 'monthly' ? 'Mensual' : 'Anual'} · día {r.day_of_month}
-                  </span>
+                    {!r.is_active && ' · Inactiva'}
+                  </p>
+                  <p className="truncate text-xs text-slate-400">
+                    {byId.get(r.from_account_id) ?? '—'} → {byId.get(r.to_account_id) ?? '—'}
+                  </p>
                 </div>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {byId.get(r.from_account_id) ?? '—'} → {byId.get(r.to_account_id) ?? '—'}
-                </p>
-              </div>
-              <Money cents={r.amount_cents} className={cn('shrink-0 font-semibold', !r.is_active && 'text-slate-400')} />
-              <div className="flex shrink-0 gap-1">
-                <button
-                  onClick={() => {
-                    setEditing(r)
-                    setOpen(true)
-                  }}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => onDelete(r)}
-                  className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-700"
-                >
-                  Eliminar
-                </button>
-              </div>
-            </div>
-          ))}
+                <Money cents={r.amount_cents} className="shrink-0 font-semibold" />
+                <div className="flex shrink-0">
+                  <button
+                    onClick={() => {
+                      setEditing(r)
+                      setOpen(true)
+                    }}
+                    aria-label={`Editar ${r.description}`}
+                    title="Editar"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-brand-50 hover:text-brand"
+                  >
+                    <PencilIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => onDelete(r)}
+                    aria-label={`Eliminar ${r.description}`}
+                    title="Eliminar"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 
