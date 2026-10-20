@@ -9,6 +9,7 @@ import { useConfirm } from '@/components/confirmContext'
 import { Money } from '@/components/Money'
 import { ProgressBar } from '@/components/ProgressBar'
 import { EmptyState, ErrorState, LoadingState } from '@/components/states'
+import { PencilIcon, TrashIcon } from '@/components/icons'
 import { tryEuroToCents, formatEuro } from '@/lib/money'
 import { monthsToTarget, requiredMonthlyContribution } from '@/lib/metrics'
 import { currentMonthKey, formatDate, todayISO } from '@/lib/dates'
@@ -62,12 +63,20 @@ export function ObjetivosPage() {
   }
 
   const list = goals.data ?? []
+  const actualOf = (g: Goal) =>
+    g.linked_account_id ? (balanceById.get(g.linked_account_id) ?? 0) : 0
+  // Los objetivos que superan su meta no inflan el total: se recorta a la meta.
+  const totalActual = list.reduce((s, g) => s + Math.min(actualOf(g), g.target_cents), 0)
+  const totalTarget = list.reduce((s, g) => s + g.target_cents, 0)
+  const totalProgress = totalTarget > 0 ? totalActual / totalTarget : 0
+  const done = list.filter((g) => g.target_cents > 0 && actualOf(g) >= g.target_cents).length
 
   return (
     <div>
       <PageTour id="objetivos" />
       <PageHeader
         title="Objetivos"
+        subtitle="Lo que ahorras para cada meta"
         onHelp={() => showTour('objetivos')}
         action={<Button onClick={openNew}>Nuevo</Button>}
       />
@@ -79,104 +88,130 @@ export function ObjetivosPage() {
           action={<Button onClick={openNew}>Nuevo objetivo</Button>}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {list.map((g) => {
-            const actual = g.linked_account_id
-              ? (balanceById.get(g.linked_account_id) ?? 0)
-              : 0
-            const remaining = Math.max(0, g.target_cents - actual)
-            const progress = g.target_cents > 0 ? actual / g.target_cents : 0
-            const months = monthsToTarget(remaining, g.monthly_contribution_cents)
-            const required = g.deadline
-              ? requiredMonthlyContribution(remaining, g.deadline, todayISO())
-              : null
-            // Aportación real del mes: traspasos netos a la cuenta vinculada.
-            const contributed = g.linked_account_id
-              ? Math.max(0, inflows.data?.get(g.linked_account_id) ?? 0)
-              : null
-            return (
-              <Card key={g.id} className="p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-slate-900">{g.name}</h3>
-                    <p className="text-xs text-slate-500">
-                      Meta {formatEuro(g.target_cents)} · {formatEuro(g.monthly_contribution_cents)}/mes
-                    </p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => openEdit(g)}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => onDelete(g)}
-                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-700"
-                    >
-                      Eliminar
-                    </button>
-                  </div>
-                </div>
+        <div className="space-y-4">
+          <section className="rounded-2xl bg-brand p-5 text-white shadow-lg shadow-brand/25">
+            <p className="text-xs font-medium uppercase tracking-wide text-white/70">Ahorrado en objetivos</p>
+            <p className="mt-1 text-4xl font-bold tracking-tight tabular-nums">
+              {formatEuro(totalActual)}
+            </p>
+            <p className="mt-1 text-sm text-white/70">
+              de {formatEuro(totalTarget)} · {done} de {list.length} cumplido{done === 1 ? '' : 's'}
+            </p>
+            <div
+              className="mt-4 h-2 overflow-hidden rounded-full bg-white/20"
+              role="progressbar"
+              aria-label="Progreso total"
+              aria-valuenow={Math.round(totalProgress * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div className="h-full rounded-full bg-white" style={{ width: `${totalProgress * 100}%` }} />
+            </div>
+          </section>
 
-                <div className="mt-3">
-                  <ProgressBar value={progress} />
-                  <div className="mt-2 flex justify-between text-sm">
-                    <span className="text-slate-600">
-                      <Money cents={actual} /> de <Money cents={g.target_cents} />
-                    </span>
-                    <span className="font-medium text-slate-900">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {list.map((g) => {
+              const actual = actualOf(g)
+              const remaining = Math.max(0, g.target_cents - actual)
+              const progress = g.target_cents > 0 ? actual / g.target_cents : 0
+              const months = monthsToTarget(remaining, g.monthly_contribution_cents)
+              const required = g.deadline
+                ? requiredMonthlyContribution(remaining, g.deadline, todayISO())
+                : null
+              // Aportación real del mes: traspasos netos a la cuenta vinculada.
+              const contributed = g.linked_account_id
+                ? Math.max(0, inflows.data?.get(g.linked_account_id) ?? 0)
+                : null
+              return (
+                <Card key={g.id} className="p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-semibold text-slate-900">{g.name}</h3>
+                      <p className="text-xs text-slate-500">
+                        {formatEuro(g.monthly_contribution_cents)}/mes planificados
+                      </p>
+                    </div>
+                    <div className="flex shrink-0">
+                      <button
+                        onClick={() => openEdit(g)}
+                        aria-label={`Editar ${g.name}`}
+                        title="Editar"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-brand-50 hover:text-brand"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => onDelete(g)}
+                        aria-label={`Eliminar ${g.name}`}
+                        title="Eliminar"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-700"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-baseline justify-between gap-2">
+                    <p className="text-2xl font-bold tracking-tight tabular-nums text-slate-900">
+                      <Money cents={actual} />
+                      <span className="ml-1 text-sm font-normal text-slate-500">
+                        de <Money cents={g.target_cents} />
+                      </span>
+                    </p>
+                    <span className="text-sm font-semibold tabular-nums text-slate-900">
                       {Math.round(progress * 100)}%
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Faltan <Money cents={remaining} />
+                  <ProgressBar className="mt-2" value={progress} />
+                  <p className="mt-2 text-xs text-slate-500">
                     {months === 0
-                      ? ' · objetivo cumplido 🎉'
+                      ? 'Objetivo cumplido 🎉'
                       : months === null
-                        ? ' · sin aportación mensual definida'
-                        : ` · ~${months} mes(es) al ritmo actual`}
+                        ? 'Sin aportación mensual definida'
+                        : `Faltan ${formatEuro(remaining)} · ~${months} mes(es) al ritmo actual`}
                   </p>
 
-                  {g.deadline && (
-                    <p className="mt-1 text-xs text-slate-500">
-                      Fecha límite {formatDate(g.deadline)}
-                      {required?.status === 'ok' && (
-                        <>
-                          {' · necesitas '}
-                          <strong className="font-semibold text-slate-700">
-                            {formatEuro(required.cents)}/mes
-                          </strong>
-                          {` durante ${required.monthsLeft} mes(es)`}
-                        </>
+                  {(g.deadline || required?.status === 'expired') && (
+                    <div className="mt-3 rounded-xl bg-slate-50 p-3 text-xs text-slate-600">
+                      {g.deadline && (
+                        <p>
+                          Fecha límite {formatDate(g.deadline)}
+                          {required?.status === 'ok' && (
+                            <>
+                              {' · necesitas '}
+                              <strong className="font-semibold text-slate-900">
+                                {formatEuro(required.cents)}/mes
+                              </strong>
+                              {` durante ${required.monthsLeft} mes(es)`}
+                            </>
+                          )}
+                        </p>
                       )}
-                    </p>
+                      {required?.status === 'expired' && (
+                        <p className="mt-1 font-medium text-rose-600">
+                          La fecha límite ya ha pasado y todavía falta dinero.
+                        </p>
+                      )}
+                      {required?.status === 'ok' &&
+                        (required.cents > g.monthly_contribution_cents ? (
+                          <p className="mt-1 font-medium text-amber-600">
+                            ⚠ Tu aportación planificada no llega: te faltan{' '}
+                            {formatEuro(required.cents - g.monthly_contribution_cents)}/mes.
+                          </p>
+                        ) : (
+                          <p className="mt-1 font-medium text-emerald-600">
+                            ✓ Con tu aportación planificada llegas a tiempo.
+                          </p>
+                        ))}
+                    </div>
                   )}
-                  {required?.status === 'expired' && (
-                    <p className="mt-1 text-xs font-medium text-rose-600">
-                      La fecha límite ya ha pasado y todavía falta dinero.
-                    </p>
-                  )}
-                  {required?.status === 'ok' &&
-                    (required.cents > g.monthly_contribution_cents ? (
-                      <p className="mt-1 text-xs font-medium text-amber-600">
-                        ⚠ Tu aportación planificada ({formatEuro(g.monthly_contribution_cents)}/mes)
-                        no llega: te faltan {formatEuro(required.cents - g.monthly_contribution_cents)}
-                        /mes.
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-xs font-medium text-emerald-600">
-                        ✓ Con tu aportación planificada llegas a tiempo.
-                      </p>
-                    ))}
 
                   {contributed !== null && (
-                    <div className="mt-3 border-t border-slate-100 pt-3">
-                      <div className="flex justify-between text-xs text-slate-500">
+                    <div className={'mt-3 border-t border-slate-100 pt-3'}>
+                      <div className="flex justify-between gap-2 text-xs text-slate-500">
                         <span>Aportado este mes</span>
                         <span className="tabular-nums text-slate-700">
-                          {formatEuro(contributed)} de {formatEuro(g.monthly_contribution_cents)}{' '}
-                          planificados
+                          {formatEuro(contributed)} de {formatEuro(g.monthly_contribution_cents)}
                         </span>
                       </div>
                       {g.monthly_contribution_cents > 0 && (
@@ -187,10 +222,10 @@ export function ObjetivosPage() {
                       )}
                     </div>
                   )}
-                </div>
-              </Card>
-            )
-          })}
+                </Card>
+              )
+            })}
+          </div>
         </div>
       )}
 
